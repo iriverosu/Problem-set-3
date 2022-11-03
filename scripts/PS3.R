@@ -50,55 +50,54 @@ cbd
 #------------------------------------------------------------- CBD -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------  
 Isabella 
 # Bgtá (https://www.larepublica.co/economia/concentracion-de-trabajadores-no-es-proporcional-respecto-a-las-zonas-de-residencia-3453320)
-## geocode_OSM no reconoce el caracter #, en su lugar se usa %23% 
-cbd <- geocode_OSM("Centro Internacional, Bogotá", as.sf=T) 
-cbd
-
-####################### commercial Bgtá
-opq(bbox = getbb("Bogotá Colombia"))
-## Guardamos un amenity con el Poligono que en este caso es bogota con los coelgios 
-osm5 = opq(bbox = getbb("Bogotá Colombia")) %>%
-  add_osm_feature(key="building" , value="commercial") 
-## Fijamos un objeto
-osm_sf5 = osm5 %>% osmdata_sf()
-osm_sf5
-commercial_bog = osm_sf5$osm_points %>% select(osm_id,amenity) 
-commercial_bog
-### Si queremos visualizarlo
-leaflet() %>% addTiles() %>% addCircleMarkers(data=commercial_bog , col="red")
-
+####################### Delimitar Bogotá 
 ####################### Office Bgtá
-opq(bbox = getbb("Bogotá Colombia"))
+## Bbox (mapa)
+leaflet() %>% addTiles() %>% addPolygons(data=Bogota)
+Bogota <- getbb(place_name = "Bogota", 
+                featuretype = "boundary:administrative", 
+                format_out = "sf_polygon") %>% .$multipolygon
+## Oficinas
 ## Guardamos un amenity con el Poligono que en este caso es bogota con los coelgios 
-osm6 = opq(bbox = getbb("Bogotá Colombia")) %>%
-  add_osm_feature(key="building" , value="office") 
+    osm6 = opq(bbox = getbb("Bogotá Colombia")) %>%
+    add_osm_feature(key="building" , value="office") 
 ## Fijamos un objeto
-osm_sf6 = osm6 %>% osmdata_sf()
-osm_sf6
-office_bog = osm_sf6$osm_points %>% select(osm_id,building) 
-office_bog
-### Si queremos visualizarlo
-leaflet() %>% addTiles() %>% addCircleMarkers(data=office_bog , col="red")
-
+    osm_sf6 = osm6 %>% osmdata_sf()
+    osm_sf6
+    office_bog = osm_sf6$osm_points %>% select(osm_id) 
+    office_bog
+    ### Si queremos visualizarlo
+    leaflet() %>% addTiles() %>% addCircleMarkers(data=office_bog, col="red")
+## Interceptando oficinas con Bogotá
+    office_bog$intercep <- st_intersects(office_bog, Bogota,sparse=FALSE)[,1]
+    office_bog<- office_bog[office_bog$intercep == TRUE, ]
+    leaflet() %>% addTiles() %>% addPolygons(data=Bogota,col="red") %>% addCircles(data=office_bog, col="black")
+    table(office_bog$intercep)
+    
 ####################### Industria Bgtá
-opq(bbox = getbb("Bogotá Colombia"))
-## Guardamos un amenity con el Poligono que en este caso es bogota con los coelgios 
-osm9 = opq(bbox = getbb("Bogotá Colombia")) %>%
-  add_osm_feature(key="building" , value="industrial") 
-## Fijamos un objeto
-osm_sf9 = osm9 %>% osmdata_sf()
-osm_sf9
-industrial_bog = osm_sf9$osm_points %>% select(osm_id,building) 
-industrial_bog
-### Si queremos visualizarlo
-leaflet() %>% addTiles() %>% addCircleMarkers(data=industrial_bog , col="red")
-
+    ## Guardamos un amenity con el Poligono que en este caso es bogota con los coelgios 
+      osm9 = opq(bbox = getbb("Bogotá Colombia")) %>%
+      add_osm_feature(key="building" , value="industrial") 
+    ## Fijamos un objeto
+    osm_sf9 = osm9 %>% osmdata_sf()
+    osm_sf9
+    industrial_bog = osm_sf9$osm_points %>% select(osm_id) 
+    industrial_bog
+    ### Si queremos visualizarlo
+    leaflet() %>% addTiles() %>% addCircleMarkers(data=industrial_bog , col="red")
+    ## Interceptando industria con Bogotá
+    industrial_bog$intercep <- st_intersects(industrial_bog, Bogota,sparse=FALSE)[,1]
+    industrial_bog<- industrial_bog[industrial_bog$intercep == TRUE, ]
+    leaflet() %>% addTiles() %>% addPolygons(data=Bogota,col="red") %>% addCircles(data=industrial_bog, col="black")
+    table(industrial_bog$intercep)
+    
 #Medellín
 #industria
 opq(bbox = getbb("Medellín Colombia"))
 ## Guardamos un amenity con el Poligono que en este caso es bogota con los coelgios 
 osm7 = opq(bbox = getbb("Medellín Colombia")) %>%
   add_osm_feature(key="building" , value="industrial") 
+
 ## Fijamos un objeto
 osm_sf7 = osm7 %>% osmdata_sf()
 osm_sf7
