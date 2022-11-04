@@ -1,53 +1,60 @@
-install.packages("tidyverse")
-install.packages("pacman")
-install.packages("osmdata")
-install.packages("httr2")
-library(httr2)
-library(osmdata)
-library(pacman)
-require(pacman)
-p_load(here,knitr,tidyverse,ggthemes,fontawesome,kableExtra)
-p_load(tidyverse,rio,viridis,sf, leaflet, tmaptools)
-# option html
-options(htmltools.dir.version = F)
-opts_chunk$set(fig.align="center", fig.height=4 , dpi=300 , cache=F)
-remotes::install_github('ropensci/osmdata')
-
-
-#Variables PS3 
-#1.Área total o cubierta
-#2.bedrooms
-#3.bathrooms (k-vecinos)
-#4.property type
-#5.Distancia al CBD
-#6.Distancia Tansporte (estaciones o vías arteriales)
-#7.Distancia Colegios, universidades, kindergarden
-#8.IPM #coordenadas
-
-#data como sf
-train2 <- st_as_sf(x = train, ## datos
-                   coords=c("lon","lat"), ## coordenadas
-                   crs=4326) ## CRS
-
-leaflet() %>% addTiles() %>% addCircleMarkers(data=train2)
-class(houses)
-class(train2)
-table(train2$rooms, train2$bedrooms)
-sum(is.na(train2$bedrooms))
-sum(is.na(train2$bathrooms)) #15032
-
-
-#------------------------------------------------------------- OSM ------------------------------------------------------------  
-## Buscar un lugar público por el nombre
-geocode_OSM("Casa de Nariño, Bogotá")
-## geocode_OSM no reconoce el caracter #, en su lugar se usa %23% 
-cbd <- geocode_OSM("Centro Internacional, Bogotá", as.sf=T) 
-cbd
-
+#------------------------------------------------------------- Paquetes, lectura bases, NaN -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------  
+#1.Paquetes--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------  
+    install.packages("tidyverse")
+    install.packages("pacman")
+    install.packages("osmdata")
+    install.packages("httr2")
+    library(httr2)
+    library(osmdata)
+    library(pacman)
+    require(pacman)
+    p_load(here,knitr,tidyverse,ggthemes,fontawesome,kableExtra)
+    p_load(tidyverse,rio,viridis,sf, leaflet, tmaptools)
+    # option html
+    options(htmltools.dir.version = F)
+    opts_chunk$set(fig.align="center", fig.height=4 , dpi=300 , cache=F)
+    remotes::install_github('ropensci/osmdata')
+#2.Bases y variables--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------  
+  ##Data como sf
+    train2 <- st_as_sf(x = train, ## datos
+                       coords=c("lon","lat"), ## coordenadas
+                       crs=4326) ## CRS
+    
+    leaflet() %>% addTiles() %>% addCircleMarkers(data=train2)
+    class(train2)
+    
+  ##Variables
+    #1.Área total o cubierta
+    #2.bedrooms
+    #3.bathrooms (k-vecinos)
+    #4.property type
+    #5.Distancia al CBD
+    #6.Distancia Tansporte (estaciones o vías arteriales)
+    #7.Distancia Colegios, universidades, kindergarden
+    #8.IPM #coordenadas
+    
+#3. NaN --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------  
+    
+    table(train2$rooms, train2$bedrooms)
+    table(train2$rooms, train2$bedrooms)
+    sum(is.na(train2$bedrooms)) #0
+    sum(is.na(train2$bathrooms)) #15032
+    sum(is.na(train2$surface_total)) #39044
+    sum(is.na(train2$surface_covered)) #41745
+    
+    train2$surface_total = ifelse(is.na(train_hogares$P5130)==T,0,train_hogares$P5130)
+    train_hogares$P5140 = ifelse(is.na(train_hogares$P5140)==T,0,train_hogares$P5140)
+    train_hogares$Horas_trabajo1 = ifelse(is.na(train_hogares$Horas_trabajo1)==T,0,train_hogares$Horas_trabajo1)
+    train_hogares$Horas_trabajo2 = ifelse(is.na(train_hogares$Horas_trabajo2)==T,0,train_hogares$Horas_trabajo2)
+    train_hogares$subsidio<-(ifelse((train_hogares$subsidio>0),1,0))
+    arriendo_estimado<-train_hogares$P5130+train_hogares$P5140
+    train_hogares<-cbind(train_hogares,arriendo_estimado)
+    
+    
 #------------------------------------------------------------- área -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------  
 #1. total=cubierta
 #2. Texto 
-#------------------------------------------------------------- CBD (office, industrial, retail) -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------  
+#------------------------------------------------------------- CBD ----------------------------------------------------------------------------------------------------------------------------------------------------
 #----1. Bogotá  -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------  
 ####################### Delimitar Bogotá 
           Bogota <- getbb(place_name = "Bogota", 
@@ -484,7 +491,7 @@ leaflet() %>% addTiles() %>% addPolygons(data=Medellin,col="red") %>% addCircles
 # Bgtá
 # Medellín 
 # Cali 
-#--------------------------------------------------------- Calculo variables ---------------------------------------------------------------------------------------------------------------------- 
+#--------------------------------------------------------- Calculo variables modelo  ---------------------------------------------------------------------------------------------------------------------- 
 #Train 
 #Test
 #-------------------------------------------------------------- Modelo ---------------------------------------------------------------------------------------------------------------------- 
