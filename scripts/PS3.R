@@ -43,17 +43,70 @@
     sum(is.na(train2$surface_covered)) #41745
     
     train2$surface_total = ifelse(is.na(train_hogares$P5130)==T,0,train_hogares$P5130)
-    train_hogares$P5140 = ifelse(is.na(train_hogares$P5140)==T,0,train_hogares$P5140)
-    train_hogares$Horas_trabajo1 = ifelse(is.na(train_hogares$Horas_trabajo1)==T,0,train_hogares$Horas_trabajo1)
-    train_hogares$Horas_trabajo2 = ifelse(is.na(train_hogares$Horas_trabajo2)==T,0,train_hogares$Horas_trabajo2)
     train_hogares$subsidio<-(ifelse((train_hogares$subsidio>0),1,0))
-    arriendo_estimado<-train_hogares$P5130+train_hogares$P5140
-    train_hogares<-cbind(train_hogares,arriendo_estimado)
-    
-    
+
+  
 #------------------------------------------------------------- área -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------  
 #1. total=cubierta
 #2. Texto 
+    train2$area<-str_detect(string = train2$description , pattern = "área") 
+    table(train2$area) #5543
+    train2$area2<-str_detect(string = train2$description , pattern = "area") 
+    table(train2$area2) #1463
+    train2$area3<-str_detect(string = train2$description , pattern = "m2") 
+    table(train2$area3) #5995
+    train2$area4<-str_detect(string = train2$description , pattern = "M2") 
+    table(train2$area4) #4118 
+    train2$area5<-str_detect(string = train2$description , pattern = "mt2") 
+    table(train2$area5) #745
+    train2$area6<-str_detect(string = train2$description , pattern = "Área") 
+    table(train2$area6) #1836 
+    train2$area7<-str_detect(string = train2$description , pattern = "mts") 
+    table(train2$area7) #4544  
+    train2$area8<-str_detect(string = train2$description , pattern = "Mts") 
+    table(train2$area8) #1066 
+    train2$area9<-str_detect(string = train2$description , pattern = "MTS") 
+    table(train2$area9) #954 
+    train2$area10<-str_detect(string = train2$description , pattern = "Metros")
+    table(train2$area10) #118 
+    train2$area11<-str_detect(string = train2$description , pattern = "METROS") 
+    table(train2$area11) #380 
+    train2$area12<-str_detect(string = train2$description , pattern = "metros")
+    table(train2$area12) #4541 
+    
+    
+    ### patterns
+    x1 <- "[:space:]+[:digit:]+[:space:]+"
+    x2 <- "[:space:]+[:digit:]+[:punct:]+[:digit:]+[:space:]+"
+    train2$new_surface <- train2$surface_total
+    
+    ## replace values
+    for (i in c("metros","METROS","Metros", "MTS", "Mts", "mts", "MT", "MT2", "Mt2","m2","mt2","mts2","M2","Mts2","cuadrad","mtro","mtr2")){
+      train2 <- train2 %>% 
+        mutate(new_surface = ifelse(is.na(train2$surface_total)==T,str_extract(string=description , pattern=paste0(x1,i)),new_surface),
+               new_surface = ifelse(is.na(train2$surface_total)==T,str_extract(string=description , pattern=paste0(x2,i)),new_surface))
+    }
+    
+    ## clean var
+    for (i in c("metros","METROS","Metros", "MTS", "Mts", "mts", "MT", "MT2", "Mt2","m2","mt2","mts2","M2","Mts2","cuadrad","mtro","mtr2"," ","\n\n")){
+      train2$new_surface <- gsub(i,"",train2$new_surface)
+    }
+    train2$new_surface <- gsub(",",".",train2$new_surface)
+    train2$new_surface <- as.numeric(train2$new_surface)
+    
+
+    train2$description[4]
+    x <- "[:space:]+[:digit:]+[:punct:]+[:digit:]+[:space:]+"
+    str_locate_all(string = train2$description[4] , pattern = x) ## detect pattern
+    str_extract(string = train2$description[4] , pattern= x) ## extrac pattern
+    
+
+    
+    train2 <- train2 %>% 
+      mutate(new_surface = str_extract(string=description , pattern= x))
+    table(train2$new_surface) %>% sort() %>% head()
+    
+    
 #------------------------------------------------------------- CBD ----------------------------------------------------------------------------------------------------------------------------------------------------
 #----1. Bogotá  -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------  
 ####################### Delimitar Bogotá 
