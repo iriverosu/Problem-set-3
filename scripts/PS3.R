@@ -81,7 +81,7 @@
     train2$new_surface <- train2$surface_total
     
     ## replace values
-    for (i in c("metros","METROS","Metros", "MTS", "Mts", "mts", "MT", "MT2", "Mt2","m2","mt2","mts2","M2","Mts2","cuadrad","mtro","mtr2")){
+    for (i in c("m2","mt2","mts2","M2","Mts2","cuadrad","mtro","mtr2")){
       train2 <- train2 %>% 
         mutate(new_surface = ifelse(is.na(train2$surface_total)==T,str_extract(string=description , pattern=paste0(x1,i)),new_surface),
                new_surface = ifelse(is.na(train2$surface_total)==T,str_extract(string=description , pattern=paste0(x2,i)),new_surface))
@@ -95,10 +95,10 @@
     train2$new_surface <- as.numeric(train2$new_surface)
     
 
-    train2$description[4]
+    train2$description
     x <- "[:space:]+[:digit:]+[:punct:]+[:digit:]+[:space:]+"
-    str_locate_all(string = train2$description[4] , pattern = x) ## detect pattern
-    str_extract(string = train2$description[4] , pattern= x) ## extrac pattern
+    str_locate_all(string = train2$description , pattern = x) ## detect pattern
+    str_extract(string = train2$description , pattern= x) ## extrac pattern
     
 
     
@@ -106,7 +106,7 @@
       mutate(new_surface = str_extract(string=description , pattern= x))
     table(train2$new_surface) %>% sort() %>% head()
     
-    
+    "metros","METROS","Metros", "MTS", "Mts", "mts", "MT", "MT2", "Mt2",
 #------------------------------------------------------------- CBD ----------------------------------------------------------------------------------------------------------------------------------------------------
 #----1. Bogotá  -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------  
 ####################### Delimitar Bogotá 
