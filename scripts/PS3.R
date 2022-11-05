@@ -4,6 +4,8 @@
     install.packages("pacman")
     install.packages("osmdata")
     install.packages("httr2")
+    install.packages("missForest")
+    library(missForest)
     library(httr2)
     library(osmdata)
     library(pacman)
@@ -535,15 +537,19 @@ leaflet() %>% addTiles() %>% addPolygons(data=Medellin,col="red") %>% addCircles
       
  leaflet() %>% addTiles() %>% addPolygons(data=Cali,col="red") %>% addCircles(data=colegios_cali, col="black")%>% addCircles(data=universidades_cali, col="white")%>% addCircles(data=kinder_cali, col="yellow")
           
-#------------------------------------------------------ Bathrooms (k-vecinos)  ----------------------------------------------------------------------------------------------------------------------- 
-# Bgtá
-# Medellín 
-# Cali 
+#------------------------------------------------------ Bathrooms (arbolest de desici�n)  ----------------------------------------------------------------------------------------------------------------------- 
+ 
+ samply(train2, class)
+ #impitaci�n missings
+ im<- missForest(train2$bathrooms, verbose=TRUE, variablewise= TRUE)
+ imp$OOBerror #error que tiene
+ 
+ train2$bathrooms<-as.data.frame(imp$x.imp)
+ 
+ view(train2)
 #------------------------------------------------------------- Texto ---------------------------------------------------------------------------------------------------------------------- 
 #Garaje/parqueadero 
-# Bgtá
-# Medellín 
-# Cali 
+
 #--------------------------------------------------------- Calculo variables modelo  ---------------------------------------------------------------------------------------------------------------------- 
 #Train 
 #Test
