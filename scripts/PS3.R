@@ -537,16 +537,28 @@ leaflet() %>% addTiles() %>% addPolygons(data=Medellin,col="red") %>% addCircles
       
  leaflet() %>% addTiles() %>% addPolygons(data=Cali,col="red") %>% addCircles(data=colegios_cali, col="black")%>% addCircles(data=universidades_cali, col="white")%>% addCircles(data=kinder_cali, col="yellow")
           
-#------------------------------------------------------ Bathrooms (arbolest de desición)  ----------------------------------------------------------------------------------------------------------------------- 
+#------------------------------------------------------ Bathrooms (arbolest de desici?n)  ----------------------------------------------------------------------------------------------------------------------- 
  
- samply(train2, class)
- #impitación missings
- im<- missForest(train2$bathrooms, verbose=TRUE, variablewise= TRUE)
+ sum(is.na(train2$bathrooms))
+ class(train2$property_id)
+ train2$city<-as.factor(train2$city)
+ train2$property_type<-as.factor(train2$property_type)
+ train2$operation_type<-as.factor(train2$operation_type)
+ 
+ train3<- select(train2, city, price,surface_total,surface_covered,rooms, bedrooms,bathrooms, property_type, operation_type)
+ class(train3)
+ 
+ train3<-as.data.frame(train3)
+ 
+ 
+ #imputacion missings
+ imp <- missForest(train3, verbose=TRUE, variablewise= TRUE)
  imp$OOBerror #error que tiene
  
- train2$bathrooms<-as.data.frame(imp$x.imp)
  
- view(train2)
+ noNA<-as.data.frame(imp$ximp)
+ 
+ train2<-cbind(train2,noNA$bathrooms)
 #------------------------------------------------------------- Texto ---------------------------------------------------------------------------------------------------------------------- 
 #Garaje/parqueadero 
 
