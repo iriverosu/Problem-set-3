@@ -80,15 +80,15 @@
     ### patterns
     x1 <- "[:space:]+[:digit:]+[:space:]+"
     x2 <- "[:space:]+[:digit:]+[:punct:]+[:digit:]+[:space:]+"
-    train2$new_surface <- train2$surface_total
+    train2$new_surface <- NA
     
     ## replace values
     for (i in c("m2","mt2","mts2","M2","Mts2","cuadrad","mtro","mtr2")){
       train2 <- train2 %>% 
-        mutate(new_surface = ifelse(is.na(train2$surface_total)==T,str_extract(string=description , pattern=paste0(x1,i)),new_surface),
-               new_surface = ifelse(is.na(train2$surface_total)==T,str_extract(string=description , pattern=paste0(x2,i)),new_surface))
+        mutate(new_surface = ifelse(is.na(surface_total)==T,str_extract(string=description , pattern=paste0(x1,i)),new_surface),
+               new_surface = ifelse(is.na(surface_total)==T,str_extract(string=description , pattern=paste0(x2,i)),new_surface))
     }
-    
+   
     ## clean var
     for (i in c("metros","METROS","Metros", "MTS", "Mts", "mts", "MT", "MT2", "Mt2","m2","mt2","mts2","M2","Mts2","cuadrad","mtro","mtr2"," ","\n\n")){
       train2$new_surface <- gsub(i,"",train2$new_surface)
@@ -537,10 +537,10 @@ leaflet() %>% addTiles() %>% addPolygons(data=Medellin,col="red") %>% addCircles
       
  leaflet() %>% addTiles() %>% addPolygons(data=Cali,col="red") %>% addCircles(data=colegios_cali, col="black")%>% addCircles(data=universidades_cali, col="white")%>% addCircles(data=kinder_cali, col="yellow")
           
-#------------------------------------------------------ Bathrooms (arbolest de desición)  ----------------------------------------------------------------------------------------------------------------------- 
+#------------------------------------------------------ Bathrooms (arbolest de desici?n)  ----------------------------------------------------------------------------------------------------------------------- 
  
  samply(train2, class)
- #impitación missings
+ #impitaci?n missings
  im<- missForest(train2$bathrooms, verbose=TRUE, variablewise= TRUE)
  imp$OOBerror #error que tiene
  
