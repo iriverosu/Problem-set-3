@@ -4,10 +4,6 @@
     install.packages("pacman")
     install.packages("osmdata")
     install.packages("httr2")
-    install.packages("missForest")
-    install.packages("ranger")
-    library(ranger)
-    library(missForest)
     library(httr2)
     library(osmdata)
     library(pacman)
@@ -47,72 +43,17 @@
     sum(is.na(train2$surface_covered)) #41745
     
     train2$surface_total = ifelse(is.na(train_hogares$P5130)==T,0,train_hogares$P5130)
+    train_hogares$P5140 = ifelse(is.na(train_hogares$P5140)==T,0,train_hogares$P5140)
+    train_hogares$Horas_trabajo1 = ifelse(is.na(train_hogares$Horas_trabajo1)==T,0,train_hogares$Horas_trabajo1)
+    train_hogares$Horas_trabajo2 = ifelse(is.na(train_hogares$Horas_trabajo2)==T,0,train_hogares$Horas_trabajo2)
     train_hogares$subsidio<-(ifelse((train_hogares$subsidio>0),1,0))
-
-  
+    arriendo_estimado<-train_hogares$P5130+train_hogares$P5140
+    train_hogares<-cbind(train_hogares,arriendo_estimado)
+    
+    
 #------------------------------------------------------------- área -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------  
 #1. total=cubierta
 #2. Texto 
-    train2$area<-str_detect(string = train2$description , pattern = "área") 
-    table(train2$area) #5543
-    train2$area2<-str_detect(string = train2$description , pattern = "area") 
-    table(train2$area2) #1463
-    train2$area3<-str_detect(string = train2$description , pattern = "m2") 
-    table(train2$area3) #5995
-    train2$area4<-str_detect(string = train2$description , pattern = "M2") 
-    table(train2$area4) #4118 
-    train2$area5<-str_detect(string = train2$description , pattern = "mt2") 
-    table(train2$area5) #745
-    train2$area6<-str_detect(string = train2$description , pattern = "Área") 
-    table(train2$area6) #1836 
-    train2$area7<-str_detect(string = train2$description , pattern = "mts") 
-    table(train2$area7) #4544  
-    train2$area8<-str_detect(string = train2$description , pattern = "Mts") 
-    table(train2$area8) #1066 
-    train2$area9<-str_detect(string = train2$description , pattern = "MTS") 
-    table(train2$area9) #954 
-    train2$area10<-str_detect(string = train2$description , pattern = "Metros")
-    table(train2$area10) #118 
-    train2$area11<-str_detect(string = train2$description , pattern = "METROS") 
-    table(train2$area11) #380 
-    train2$area12<-str_detect(string = train2$description , pattern = "metros")
-    table(train2$area12) #4541 
-    
-    
-    ### patterns
-    x1 <- "[:space:]+[:digit:]+[:space:]+"
-    x2 <- "[:space:]+[:digit:]+[:punct:]+[:digit:]+[:space:]+"
-    train2$new_surface <- NA
-    
-    ## replace values
-    for (i in c("m2","mt2","mts2","M2","Mts2","cuadrad","mtro","mtr2")){
-      train2 <- train2 %>% 
-        mutate(new_surface = ifelse(is.na(surface_total)==T,str_extract(string=description , pattern=paste0(x1,i)),new_surface),
-               new_surface = ifelse(is.na(surface_total)==T,str_extract(string=description , pattern=paste0(x2,i)),new_surface))
-    }
-   
-    ## clean var
-    for (i in c("metros","METROS","Metros", "MTS", "Mts", "mts", "MT", "MT2", "Mt2","m2","mt2","mts2","M2","Mts2","cuadrad","mtro","mtr2"," ","\n\n")){
-      train2$new_surface <- gsub(i,"",train2$new_surface)
-    }
-    train2$new_surface <- gsub(",",".",train2$new_surface)
-    train2$new_surface <- as.numeric(train2$new_surface)
-    
-
-    train2$description
-    x <- "[:space:]+[:digit:]+[:punct:]+[:digit:]+[:space:]+"
-    str_locate_all(string = train2$description , pattern = x) ## detect pattern
-    str_extract(string = train2$description , pattern= x) ## extrac pattern
-    
-
-    
-    train2 <- train2 %>% 
-      mutate(new_surface = str_extract(string=description , pattern= x))
-    table(train2$new_surface) %>% sort() %>% head()
-    
-    sum(is.na(train2$new_surface))
-    
-   # "metros","METROS","Metros", "MTS", "Mts", "mts", "MT", "MT2", "Mt2",
 #------------------------------------------------------------- CBD ----------------------------------------------------------------------------------------------------------------------------------------------------
 #----1. Bogotá  -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------  
 ####################### Delimitar Bogotá 
@@ -296,11 +237,66 @@ leaflet() %>% addTiles() %>% addPolygons(data=Medellin,col="red") %>% addCircles
 leaflet() %>% addTiles() %>% addPolygons(data=Cali,col="red") %>% addCircles(data=industrial_cali, col="black")%>% addCircles(data=office_cali, col="white")%>% addCircles(data=retail_cali, col="yellow")
             
 #-------------------------------------------------- Transporte (vías y estaciones) ----------------------------------------------------------------------------------------------------------------------- 
+#----1. Bogotá  -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------  
+####################### Delimitar Bogotá 
+Bogota <- getbb(place_name = "Bogota", 
+                featuretype = "boundary:administrative", 
+                format_out = "sf_polygon") %>% .$multipolygon
+Bogota<-Bogota[1,]
+leaflet() %>% addTiles() %>% addPolygons(data=Bogota)
+
+#----2. Medellín  -----------------------------------------------------------------------------------------------------------------------------------
+####################### Delimitar Medellín 
+Medellin <- getbb(place_name = "Medellin Antioquia Colombia", 
+                  featuretype = "boundary:administrative", 
+                  format_out = "sf_polygon") 
+Medellin<-Medellin[1,]
+leaflet() %>% addTiles() %>% addPolygons(data=Medellin)
+
+#----3. Cali  -----------------------------------------------------------------------------------------------------------------------------------
+####################### Delimitar Cali 
+Cali <- getbb(place_name = " Cali Colombia", 
+              featuretype = "boundary:administrative", 
+              format_out = "sf_polygon") 
+leaflet() %>% addTiles() %>% addPolygons(data=Cali)
+Cali<-Cali[1,]
+leaflet() %>% addTiles() %>% addPolygons(data=Cali)
+
+#-------------------------------------------------- Transporte (vías y estaciones) ----------------------------------------------------------------------------------------------------------------------- 
+#----1. Bogotá  -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------  
+
+#-------------------------------------------------- Transporte (vías y estaciones) ----------------------------------------------------------------------------------------------------------------------- 
 # option html
 options(htmltools.dir.version = F)
 opts_chunk$set(fig.align="center", fig.height=4 , dpi=300 , cache=F)
 remotes::install_github('ropensci/osmdata')
 
+#----1. Bogotá  -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------  
+####################### Delimitar Bogotá 
+Bogota <- getbb(place_name = "Bogota", 
+                featuretype = "boundary:administrative", 
+                format_out = "sf_polygon") %>% .$multipolygon
+Bogota<-Bogota[1,]
+leaflet() %>% addTiles() %>% addPolygons(data=Bogota)
+
+#----2. Medellín  -----------------------------------------------------------------------------------------------------------------------------------
+####################### Delimitar Medellín 
+Medellin <- getbb(place_name = "Medellin Antioquia Colombia", 
+                  featuretype = "boundary:administrative", 
+                  format_out = "sf_polygon") 
+Medellin<-Medellin[1,]
+leaflet() %>% addTiles() %>% addPolygons(data=Medellin)
+
+#----3. Cali  -----------------------------------------------------------------------------------------------------------------------------------
+####################### Delimitar Cali 
+Cali <- getbb(place_name = " Cali Colombia", 
+              featuretype = "boundary:administrative", 
+              format_out = "sf_polygon") 
+leaflet() %>% addTiles() %>% addPolygons(data=Cali)
+Cali<-Cali[1,]
+leaflet() %>% addTiles() %>% addPolygons(data=Cali)
+
+#-------------------------------------------------- Transporte (vías y estaciones) ----------------------------------------------------------------------------------------------------------------------- 
 #----1. Bogotá  -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------  
 ####################### Delimitar Bogotá 
 Bogota <- getbb(place_name = "Bogota", 
@@ -360,7 +356,11 @@ leaflet() %>% addTiles() %>% addPolylines(data=vias_bog , col="red")
 ## Interceptando vias con Bogotá
 vias_bog$intercep <- st_intersects(vias_bog, Bogota,sparse=FALSE)[,1]
 vias_bog<- vias_bog[vias_bog$intercep == TRUE, ]
-leaflet() %>% addTiles() %>% addPolygons(data=Bogota,col="red") %>% addPolylines(data=vias_bog, col="black") %>% addPolylines(data=vias_bog, col="blue")
+<<<<<<< HEAD
+leaflet() %>% addTiles() %>% addPolygons(data=Bogota,col="red") %>% addPolylines(data=vias_bog, col="black")
+=======
+  leaflet() %>% addTiles() %>% addPolygons(data=Bogota,col="red") %>% addPolylines(data=vias_bog, col="black") %>% addPolylines(data=vias_bog, col="blue")
+>>>>>>> 67095de1aeaa7f59019b7a4291ec1d244a280026
 table(vias_bog$intercep)
 
 
@@ -398,7 +398,11 @@ leaflet() %>% addTiles() %>% addPolylines(data=vias_med , col="red")
 ## Interceptando vias con Medellin
 vias_med$intercep <- st_intersects(vias_med, Medellin,sparse=FALSE)[,1]
 vias_med<- vias_med[vias_med$intercep == TRUE, ]
-leaflet() %>% addTiles() %>% addPolygons(data=Medellin,col="red") %>% addPolylines(data=vias_med, col="black")%>% addPolylines(data=vias_med, col="blue")
+<<<<<<< HEAD
+leaflet() %>% addTiles() %>% addPolygons(data=Medellin,col="red") %>% addPolylines(data=vias_med, col="black")
+=======
+  leaflet() %>% addTiles() %>% addPolygons(data=Medellin,col="red") %>% addPolylines(data=vias_med, col="black")%>% addPolylines(data=vias_med, col="blue")
+>>>>>>> 67095de1aeaa7f59019b7a4291ec1d244a280026
 table(vias_med$intercep)
 
 
@@ -414,7 +418,11 @@ metro_med = osm_sf9$osm_points %>% select(osm_id)
 metro_med
 ### Si queremos visualizarlo
 leaflet() %>% addTiles() %>% addCircleMarkers(data=metro_med , col="red")
-## Interceptando industria con Medellin
+<<<<<<< HEAD
+## Interceptando industria con Bogotá
+=======
+  ## Interceptando industria con Medellin
+  >>>>>>> 67095de1aeaa7f59019b7a4291ec1d244a280026
 metro_med$intercep <- st_intersects(metro_med, Medellin,sparse=FALSE)[,1]
 metro_med<- metro_med[metro_med$intercep == TRUE, ]
 leaflet() %>% addTiles() %>% addPolygons(data=Medellin,col="red") %>% addCircles(data=metro_med, col="black")%>% addCircles(data=metro_med, col="white")
@@ -453,11 +461,19 @@ osm_sf11
 vias_cali = osm_sf11$osm_lines %>% select(osm_id) 
 vias_cali
 ### Si queremos visualizarlo
-
-## Interceptando vias con Cali
+<<<<<<< HEAD
+leaflet() %>% addTiles() %>% addLines(data=vias_cali , col="red")
+## Interceptando vias con Bogotá
 vias_cali$intercep <- st_intersects(vias_cali, Cali,sparse=FALSE)[,1]
 vias_cali<- vias_cali[vias_cali$intercep == TRUE, ]
+leaflet() %>% addTiles() %>% addPolygons(data=Cali,col="red") %>% addPolylines(data=vias_cali, col="black")
+=======
+  
+  ## Interceptando vias con Cali
+  vias_cali$intercep <- st_intersects(vias_cali, Cali,sparse=FALSE)[,1]
+vias_cali<- vias_cali[vias_cali$intercep == TRUE, ]
 leaflet() %>% addTiles() %>% addPolygons(data=Cali,col="red") %>% addPolylines(data=vias_cali, col="black")%>% addPolylines(data=vias_cali, col="blue")
+
 
 
 
@@ -602,97 +618,19 @@ leaflet() %>% addTiles() %>% addPolygons(data=Medellin,col="red") %>% addCircles
       
  leaflet() %>% addTiles() %>% addPolygons(data=Cali,col="red") %>% addCircles(data=colegios_cali, col="black")%>% addCircles(data=universidades_cali, col="white")%>% addCircles(data=kinder_cali, col="yellow")
           
-<<<<<<< HEAD
-#------------------------------------------------------ Bathrooms (arbolest de desici?n)  ----------------------------------------------------------------------------------------------------------------------- 
- 
- samply(train2, class)
- #impitaci?n missings
- im<- missForest(train2$bathrooms, verbose=TRUE, variablewise= TRUE)
-=======
-#------------------------------------------------------ Bathrooms (arboles de desicion)  ----------------------------------------------------------------------------------------------------------------------- 
- 
- sum(is.na(train2$bathrooms))
- class(train2$property_id)
- train2$city<-as.factor(train2$city)
- train2$property_type<-as.factor(train2$property_type)
- train2$operation_type<-as.factor(train2$operation_type)
- 
- train3<- select(train2, city, price,surface_total,surface_covered,rooms, bedrooms,bathrooms, property_type, operation_type)
- class(train3)
- 
- train3<-as.data.frame(train3)
- 
- 
- #imputacion missings
- imp <- missForest(train3, verbose=TRUE, variablewise= TRUE)
->>>>>>> 67095de1aeaa7f59019b7a4291ec1d244a280026
- imp$OOBerror #error que tiene
- 
- 
- noNA<-as.data.frame(imp$ximp)
- 
- train2<-cbind(train2,noNA$bathrooms)
+#------------------------------------------------------ Bathrooms (k-vecinos)  ----------------------------------------------------------------------------------------------------------------------- 
+# Bgtá
+# Medellín 
+# Cali 
 #------------------------------------------------------------- Texto ---------------------------------------------------------------------------------------------------------------------- 
 #Garaje/parqueadero 
-
+# Bgtá
+# Medellín 
+# Cali 
 #--------------------------------------------------------- Calculo variables modelo  ---------------------------------------------------------------------------------------------------------------------- 
-#Train
- #distancia a universidad
- #distancia colegio
- #distancia a vias
- #distancia bus/metro
- #distancia CBD
+#Train 
 #Test
 #-------------------------------------------------------------- Modelo ---------------------------------------------------------------------------------------------------------------------- 
-#division muestra
- set.seed(12345) 
- train2 <- train2 %>%
-   mutate(holdout= as.logical(1:nrow(train2) %in%
-                                sample(nrow(train2), nrow(train2)*.2)))
- test<-train2[train2$holdout==T,] 
- train<-train2[train2$holdout==F,]
- 
-  #Random Forest
- 
- y_train<-train$price
- x_train<-train 
- 
- 
- set.seed(12345)
- cv3 <- trainControl(number = 3, method = "cv")
- tunegrid_rf <- expand.grid(mtry = c(3, 5, 10), 
-                            min.node.size = c(10, 30, 50,
-                                              70, 100),
-                            splitrule="gini"
- )
- 
- 
- modeloRF <- train(y_train ~ .,
-                   data = cbind(y_train, x_train), 
-                   method = "ranger", 
-                   trControl = cv3,
-                   metric = 'MSE', 
-                   verbose = TRUE,
-                   tuneGrid = tunegrid_rf)
- 
- plot(modeloRF)
- 
- 
+#RF
 #Pruebas 
-#------------------------------------------------------ Estadísticas Descriptivas ---------------------------------------------------------------------------------------------------------------------- 
-
- 
- #price
- #city
- #surface
- #rooms
- #bedrooms
- #bathrooms
- #property_type
- #parqueadero
- #distancia CBD
- #distancia colegios
- #distancia universidad
- #distancia vias
- #distancia bus/metro
- 
+#------------------------------------------------------ Estadísticas Descriptívas ---------------------------------------------------------------------------------------------------------------------- 
