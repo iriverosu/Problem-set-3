@@ -264,6 +264,66 @@ leaflet() %>% addTiles() %>% addPolygons(data=Cali)
 
 #-------------------------------------------------- Transporte (vías y estaciones) ----------------------------------------------------------------------------------------------------------------------- 
 #----1. Bogotá  -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------  
+
+#-------------------------------------------------- Transporte (vías y estaciones) ----------------------------------------------------------------------------------------------------------------------- 
+# option html
+options(htmltools.dir.version = F)
+opts_chunk$set(fig.align="center", fig.height=4 , dpi=300 , cache=F)
+remotes::install_github('ropensci/osmdata')
+
+#----1. Bogotá  -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------  
+####################### Delimitar Bogotá 
+Bogota <- getbb(place_name = "Bogota", 
+                featuretype = "boundary:administrative", 
+                format_out = "sf_polygon") %>% .$multipolygon
+Bogota<-Bogota[1,]
+leaflet() %>% addTiles() %>% addPolygons(data=Bogota)
+
+#----2. Medellín  -----------------------------------------------------------------------------------------------------------------------------------
+####################### Delimitar Medellín 
+Medellin <- getbb(place_name = "Medellin Antioquia Colombia", 
+                  featuretype = "boundary:administrative", 
+                  format_out = "sf_polygon") 
+Medellin<-Medellin[1,]
+leaflet() %>% addTiles() %>% addPolygons(data=Medellin)
+
+#----3. Cali  -----------------------------------------------------------------------------------------------------------------------------------
+####################### Delimitar Cali 
+Cali <- getbb(place_name = " Cali Colombia", 
+              featuretype = "boundary:administrative", 
+              format_out = "sf_polygon") 
+leaflet() %>% addTiles() %>% addPolygons(data=Cali)
+Cali<-Cali[1,]
+leaflet() %>% addTiles() %>% addPolygons(data=Cali)
+
+#-------------------------------------------------- Transporte (vías y estaciones) ----------------------------------------------------------------------------------------------------------------------- 
+#----1. Bogotá  -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------  
+####################### Delimitar Bogotá 
+Bogota <- getbb(place_name = "Bogota", 
+                featuretype = "boundary:administrative", 
+                format_out = "sf_polygon") %>% .$multipolygon
+Bogota<-Bogota[1,]
+leaflet() %>% addTiles() %>% addPolygons(data=Bogota)
+
+#----2. Medellín  -----------------------------------------------------------------------------------------------------------------------------------
+####################### Delimitar Medellín 
+Medellin <- getbb(place_name = "Medellin Antioquia Colombia", 
+                  featuretype = "boundary:administrative", 
+                  format_out = "sf_polygon") 
+Medellin<-Medellin[1,]
+leaflet() %>% addTiles() %>% addPolygons(data=Medellin)
+
+#----3. Cali  -----------------------------------------------------------------------------------------------------------------------------------
+####################### Delimitar Cali 
+Cali <- getbb(place_name = " Cali Colombia", 
+              featuretype = "boundary:administrative", 
+              format_out = "sf_polygon") 
+leaflet() %>% addTiles() %>% addPolygons(data=Cali)
+Cali<-Cali[1,]
+leaflet() %>% addTiles() %>% addPolygons(data=Cali)
+
+#-------------------------------------------------- Transporte (vías y estaciones) ----------------------------------------------------------------------------------------------------------------------- 
+#----1. Bogotá  -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------  
 ####################### Bus station Bgtá
 ## Guardamos un amenity con el Poligono que en este caso es bogota con las estaciones de bus
 osm6 = opq(bbox = getbb("Bogotá Colombia")) %>%
@@ -296,7 +356,11 @@ leaflet() %>% addTiles() %>% addPolylines(data=vias_bog , col="red")
 ## Interceptando vias con Bogotá
 vias_bog$intercep <- st_intersects(vias_bog, Bogota,sparse=FALSE)[,1]
 vias_bog<- vias_bog[vias_bog$intercep == TRUE, ]
+<<<<<<< HEAD
 leaflet() %>% addTiles() %>% addPolygons(data=Bogota,col="red") %>% addPolylines(data=vias_bog, col="black")
+=======
+  leaflet() %>% addTiles() %>% addPolygons(data=Bogota,col="red") %>% addPolylines(data=vias_bog, col="black") %>% addPolylines(data=vias_bog, col="blue")
+>>>>>>> 67095de1aeaa7f59019b7a4291ec1d244a280026
 table(vias_bog$intercep)
 
 
@@ -334,7 +398,11 @@ leaflet() %>% addTiles() %>% addPolylines(data=vias_med , col="red")
 ## Interceptando vias con Medellin
 vias_med$intercep <- st_intersects(vias_med, Medellin,sparse=FALSE)[,1]
 vias_med<- vias_med[vias_med$intercep == TRUE, ]
+<<<<<<< HEAD
 leaflet() %>% addTiles() %>% addPolygons(data=Medellin,col="red") %>% addPolylines(data=vias_med, col="black")
+=======
+  leaflet() %>% addTiles() %>% addPolygons(data=Medellin,col="red") %>% addPolylines(data=vias_med, col="black")%>% addPolylines(data=vias_med, col="blue")
+>>>>>>> 67095de1aeaa7f59019b7a4291ec1d244a280026
 table(vias_med$intercep)
 
 
@@ -350,7 +418,11 @@ metro_med = osm_sf9$osm_points %>% select(osm_id)
 metro_med
 ### Si queremos visualizarlo
 leaflet() %>% addTiles() %>% addCircleMarkers(data=metro_med , col="red")
+<<<<<<< HEAD
 ## Interceptando industria con Bogotá
+=======
+  ## Interceptando industria con Medellin
+  >>>>>>> 67095de1aeaa7f59019b7a4291ec1d244a280026
 metro_med$intercep <- st_intersects(metro_med, Medellin,sparse=FALSE)[,1]
 metro_med<- metro_med[metro_med$intercep == TRUE, ]
 leaflet() %>% addTiles() %>% addPolygons(data=Medellin,col="red") %>% addCircles(data=metro_med, col="black")%>% addCircles(data=metro_med, col="white")
@@ -389,11 +461,21 @@ osm_sf11
 vias_cali = osm_sf11$osm_lines %>% select(osm_id) 
 vias_cali
 ### Si queremos visualizarlo
+<<<<<<< HEAD
 leaflet() %>% addTiles() %>% addLines(data=vias_cali , col="red")
 ## Interceptando vias con Bogotá
 vias_cali$intercep <- st_intersects(vias_cali, Cali,sparse=FALSE)[,1]
 vias_cali<- vias_cali[vias_cali$intercep == TRUE, ]
 leaflet() %>% addTiles() %>% addPolygons(data=Cali,col="red") %>% addPolylines(data=vias_cali, col="black")
+=======
+  
+  ## Interceptando vias con Cali
+  vias_cali$intercep <- st_intersects(vias_cali, Cali,sparse=FALSE)[,1]
+vias_cali<- vias_cali[vias_cali$intercep == TRUE, ]
+leaflet() %>% addTiles() %>% addPolygons(data=Cali,col="red") %>% addPolylines(data=vias_cali, col="black")%>% addPolylines(data=vias_cali, col="blue")
+
+
+
 
 #---------------------------------------------------- Colegios/ Universidades  ---------------------------------------------------------------------------------------------------------------------- 
 #----1. Bogotá  -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------  
