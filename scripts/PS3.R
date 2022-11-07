@@ -5,6 +5,8 @@
     install.packages("osmdata")
     install.packages("httr2")
     install.packages("missForest")
+    install.packages("ranger")
+    library(ranger)
     library(missForest)
     library(httr2)
     library(osmdata)
@@ -634,6 +636,55 @@ leaflet() %>% addTiles() %>% addPolygons(data=Medellin,col="red") %>% addCircles
  #distancia CBD
 #Test
 #-------------------------------------------------------------- Modelo ---------------------------------------------------------------------------------------------------------------------- 
-#RF
+#division muestra
+ set.seed(12345) 
+ train2 <- train2 %>%
+   mutate(holdout= as.logical(1:nrow(train2) %in%
+                                sample(nrow(train2), nrow(train2)*.2)))
+ test<-train2[train2$holdout==T,] 
+ train<-train2[train2$holdout==F,]
+ 
+  #Random Forest
+ 
+ y_train<-train$price
+ x_train<-train 
+ 
+ 
+ set.seed(12345)
+ cv3 <- trainControl(number = 3, method = "cv")
+ tunegrid_rf <- expand.grid(mtry = c(3, 5, 10), 
+                            min.node.size = c(10, 30, 50,
+                                              70, 100),
+                            splitrule="gini"
+ )
+ 
+ 
+ modeloRF <- train(y_train ~ .,
+                   data = cbind(y_train, x_train), 
+                   method = "ranger", 
+                   trControl = cv3,
+                   metric = 'MSE', 
+                   verbose = TRUE,
+                   tuneGrid = tunegrid_rf)
+ 
+ plot(modeloRF)
+ 
+ 
 #Pruebas 
-#------------------------------------------------------ Estadísticas Descriptívas ---------------------------------------------------------------------------------------------------------------------- 
+#------------------------------------------------------ Estadísticas Descriptivas ---------------------------------------------------------------------------------------------------------------------- 
+
+ 
+ #price
+ #city
+ #surface
+ #rooms
+ #bedrooms
+ #bathrooms
+ #property_type
+ #parqueadero
+ #distancia CBD
+ #distancia colegios
+ #distancia universidad
+ #distancia vias
+ #distancia bus/metro
+ 
