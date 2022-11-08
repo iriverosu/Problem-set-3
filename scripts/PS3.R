@@ -745,6 +745,124 @@ leaflet() %>% addTiles() %>% addPolygons(data=Medellin,col="red") %>% addCircles
  train2$new_surface <- as.numeric(train2$new_surface)
  
  
+ ##--------------------------IPM
+ ############################# IPM ###########################3
+ 
+ train2$geometry
+ muestra2$geometry
+ 
+ st_intersection(train2$geometry[1:5], muestra2$geometry)
+ 
+ 
+ #########################################################3
+ library(sf)
+ 
+ 
+ IPMcali<- st_read(
+   "C:/Users/HP/Downloads/OSM/VULNRB_IPMxMZ.shp")
+ 
+ DATAIPM <- as.data.frame("IPMcali")
+ 
+ 
+ muestra2 <- st_as_sf(x = muestra2, ## datos
+                      coords=c("lon","lat"), ## coordenadas
+                      crs=4326) ## CRS
+ 
+ ####
+ class(muestra2)
+ 
+ dir <- system.file("shape", package="sf")
+ list.files(dir, pattern="^[nc]")
+ 
+ plot(IPM2)
+ 
+ ############## Bogotá
+ 
+ 11001
+ 
+ ############# Medellin
+ 
+ 05001
+ 
+ ########## Cali
+ 
+ 76001
+ 
+ 
+ ### Submuestra
+ 
+ ## Cambiamos el Sistema de Coordenadas de IPM2
+ st_transform(IPM2, "WGS84") 
+ 
+ ## Cambiamos el Sistema de Coordenadas de IPM2
+ 
+ muestra2 = st_transform(muestra2, "EPSG:4326" )  ### Version Correcta
+ 
+ st_crs(muestra2) == st_crs(train2)
+ st_crs(train2)
+ 
+ st_crs
+ train2
+ 
+ st_transform(muestra2, crs=4326)
+ ####
+ muestra2 <- subset(IPM2, (IPM2$COD_MPIO=="05001" | IPM2$COD_MPIO=="11001" | IPM2$COD_MPIO=="76001"))
+ 
+ table(muestra2$COD_MPIO)
+ 
+ st_crs(muestra2)
+ #######################################3-------
+ 
+ ###- Paquetes
+ 
+ install.packages("tidyverse")
+ install.packages("pacman")
+ install.packages("osmdata")
+ install.packages("httr2")
+ library(httr2)
+ library(osmdata)
+ library(pacman)
+ require(pacman)
+ p_load(here,knitr,tidyverse,ggthemes,fontawesome,kableExtra)
+ p_load(tidyverse,rio,viridis,sf, leaflet, tmaptools)
+ 
+ 
+ train2 <- st_as_sf(x = train, ## datos
+                    coords=c("lon","lat"), ## coordenadas
+                    crs=4326) ## CRS
+ 
+ leaflet() %>% addTiles() %>% addCircleMarkers(data=train2,color="red") %>% addPolygons(data=muestra2, color="blue")
+ class(train2)
+ 
+ leaflet() %>% addTiles() %>% addPolygons(data=muestra2, color="blue")
+ 
+ 
+ train2
+ #########################33333
+ 
+ ### patterns
+ x1 <- "[:space:]+[:digit:]+[:space:]+"
+ x2 <- "[:space:]+[:digit:]+[:punct:]+[:digit:]+[:space:]+"
+ train2$new_surface <- NA
+ 
+ ## replace values
+ 
+ muestra2$IPM <- NA
+ for (i in train2$geometry ){
+   
+   for (j in muestra2$geometry) {
+     muestra2 <- muestra2 %>%
+       mutate(IPM = ifelse(st_within(i,j)==T,IPM==ipm,IPM))
+   }
+ }
+ st_contains(muestra2$geometry, train2$geometry)
+ 
+ ## clean var
+ for (i in c("metros","METROS","Metros", "MTS", "Mts", "mts", "MT", "MT2", "Mt2","m2","mt2","mts2","M2","Mts2","cuadrad","mtro","mtr2"," ","\n\n")){
+   train2$new_surface <- gsub(i,"",train2$new_surface)
+ }
+ train2$new_surface <- gsub(",",".",train2$new_surface)
+ train2$new_surface <- as.numeric(train2$new_surface)
  
  
  
