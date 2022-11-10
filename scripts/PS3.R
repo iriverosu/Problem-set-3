@@ -918,4 +918,4 @@ new_house$rooms[nb_house[[1]]]
 mean(new_house$rooms[nb_house[[1]]],na.rm=T)
 
 
-
+#### Acá termina el código !!! 10 / 11 / 22
