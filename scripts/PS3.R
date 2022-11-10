@@ -864,8 +864,58 @@ leaflet() %>% addTiles() %>% addPolygons(data=Medellin,col="red") %>% addCircles
  train2$new_surface <- gsub(",",".",train2$new_surface)
  train2$new_surface <- as.numeric(train2$new_surface)
  
+ ################## Unir train2 y muestra2
  
+ base_final <- st_join(train2,muestra2)
  
+ sum (is.na(base_final$ipm))
  
- 
- 
+
+aaa <- st_nearest_feature(new_house2$geometry[1], muestra2$geometry,pairwise=TRUE)
+
+sum(is.na(new_house$ipm.x))
+
+
+st_nearest_points()
+
+new_house <- base_final[c(1:200),]
+
+new_house2 <- subset(base_final, is.na(base_final$ipm == T) )
+
+new_house2 <- base_final[c(1:3),]
+                                                   
+
+new_mnz = muestra2
+
+leaflet() %>% addTiles() %>% addPolygons(data=new_mnz,col="red") %>% addCircles(data=new_house2)
+
+na_base_final <- 
+  
+table(new_house$city)
+
+install.packages("nngeo")
+library(nngeo)
+
+new_house <- st_join(x=new_house, y=new_mnz, join=st_nn, maxdist=20, k=1, progress=T)
+
+new_house2 <- st_join(x=new_house2, y=new_mnz, join=st_nn, maxdist=20, k=1, progress=T)
+##
+install.packages("spdep")
+library(spdep)
+new_house_sp <- new_house %>% st_buffer(20) %>% as_Spatial()
+
+nb_house = poly2nb(pl=new_house_sp, queen=T)
+
+nb_house[[1]]
+
+
+leaflet() %>% addTiles() %>% addCircles(data=new_house[32,],col="red") %>% addCircles(data=new_house[nb_house[[1]],])
+
+new_house$rooms[1]
+
+new_house$rooms[nb_house[[1]]]
+
+mean(new_house$rooms[nb_house[[1]]],na.rm=T)
+
+
+
