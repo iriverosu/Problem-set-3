@@ -51,9 +51,117 @@
     train_hogares<-cbind(train_hogares,arriendo_estimado)
     
     
+ 
+    
 #------------------------------------------------------------- área -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------  
-#1. total=cubierta
-#2. Texto 
+    #1. total=cubierta
+    #2. Texto 
+    train2$area<-str_detect(string = train2$description , pattern = "área") 
+    table(train2$area) #5543
+    train2$area2<-str_detect(string = train2$description , pattern = "area") 
+    table(train2$area2) #1463
+    train2$area3<-str_detect(string = train2$description , pattern = "m2") 
+    table(train2$area3) #5995
+    train2$area4<-str_detect(string = train2$description , pattern = "M2") 
+    table(train2$area4) #4118 
+    train2$area5<-str_detect(string = train2$description , pattern = "mt2") 
+    table(train2$area5) #745
+    train2$area6<-str_detect(string = train2$description , pattern = "Área") 
+    table(train2$area6) #1836 
+    train2$area7<-str_detect(string = train2$description , pattern = "mts") 
+    table(train2$area7) #4544  
+    train2$area8<-str_detect(string = train2$description , pattern = "Mts") 
+    table(train2$area8) #1066 
+    train2$area9<-str_detect(string = train2$description , pattern = "MTS") 
+    table(train2$area9) #954 
+    train2$area10<-str_detect(string = train2$description , pattern = "Metros")
+    table(train2$area10) #118 
+    train2$area11<-str_detect(string = train2$description , pattern = "METROS") 
+    table(train2$area11) #380 
+    train2$area12<-str_detect(string = train2$description , pattern = "metros")
+    table(train2$area12) #4541 
+    
+    
+    ### patterns
+    x1 <- "[:space:]+[:digit:]+[:space:]+"
+    x2 <- "[:space:]+[:digit:]+[:punct:]+[:digit:]+[:space:]+"
+    train2$new_surface <- train2$surface_total
+    
+    ## replace values
+    for (i in c("m2","mt2","mts2","M2","Mts2","cuadrad","mtro","mtr2","metros","METROS","Metros", "MTS","Mts","mts","MT","MT2","Mt2")){
+      train2 <- train2 %>% 
+        mutate(new_surface = ifelse(is.na(train2$surface_total)==T,str_extract(string=description , pattern=paste0(x1,i)),new_surface),
+               new_surface = ifelse(is.na(train2$surface_total)==T,str_extract(string=description , pattern=paste0(x2,i)),new_surface))
+    }
+    
+    ## clean var
+    for (i in c("metros","METROS","Metros", "MTS", "Mts", "mts", "MT", "MT2", "Mt2","m2","mt2","mts2","M2","Mts2","cuadrad","mtro","mtr2"," ","\n\n")){
+      train2$new_surface <- gsub(i,"",train2$new_surface)
+    }
+    train2$new_surface <- gsub(",",".",train2$new_surface)
+    train2$new_surface <- as.numeric(train2$new_surface)
+    
+    
+    #train2$description
+    x <- "[:space:]+[:digit:]+[:punct:]+[:digit:]+[:space:]+"
+    str_locate_all(string = train2$description , pattern = x) ## detect pattern
+    str_extract(string = train2$description , pattern= x) ## extrac pattern
+    
+    
+    
+    train2 <- train2 %>% 
+      mutate(new_surface = str_extract(string=description , pattern= x))
+    table(train2$new_surface) %>% sort() %>% head()
+    
+    sum(is.na(train2$new_surface))
+    
+    
+    # "metros","METROS","Metros", "MTS", "Mts", "mts", "MT", "MT2", "Mt2",
+    
+    train3<-train2
+    class(train3$new_surface)
+    
+    train3$new_surface<-as.numeric(train3$new_surface)
+    
+    train3$new_surface<-(ifelse(train3$new_surface >30.15,train3$new_surface,NA))
+    
+    train3$new_surface<-(ifelse((is.na(train3$surface_total)),train3$new_surface,train3$surface_total))
+    sum(is.na(train3$surface_total))#39044
+    sum(is.na(train3$new_surface))#37060
+    
+    train3$new_surface<-(ifelse((is.na(train3$new_surface)),train3$surface_covered,train3$new_surface))
+    
+    sum(is.na(train3$new_surface))#32704
+    
+    #imputacion missings con arboles
+    train3$city<-as.factor(train3$city)
+    train3$property_type<-as.factor(train3$property_type)
+    train3$operation_type<-as.factor(train3$operation_type)
+    
+    class(train3)
+    train3<-as.data.frame(train3)
+    train3<- select(train3, city, surface_total,surface_covered,new_surface,rooms, bedrooms,bathrooms, property_type)
+    
+    imp <- missForest(train3, verbose=TRUE, variablewise= TRUE)
+    imp$OOBerror #error que tiene
+    
+    
+    noNA<-as.data.frame(imp$ximp)
+    sum(is.na(noNA$new_surface))#0
+    
+    train2<-cbind(train2,noNA$new_surface)
+    names(train2)
+    
+    'surface_final'->names(train2)[names(train2)=='noNA.new_surface']
+    
+#------------------------------------------------------ Bathrooms (arboles de decision)  ----------------------------------------------------------------------------------------------------------------------- 
+    
+train2<-cbind(train2,noNA$bathrooms)
+names(train2)
+    
+'bathrooms_final'->names(train2)[names(train2)=='noNA.bathrooms']
+    
+    
 #------------------------------------------------------------- CBD ----------------------------------------------------------------------------------------------------------------------------------------------------
 #----1. Bogotá  -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------  
 ####################### Delimitar Bogotá 
@@ -618,15 +726,8 @@ leaflet() %>% addTiles() %>% addPolygons(data=Medellin,col="red") %>% addCircles
       
  leaflet() %>% addTiles() %>% addPolygons(data=Cali,col="red") %>% addCircles(data=colegios_cali, col="black")%>% addCircles(data=universidades_cali, col="white")%>% addCircles(data=kinder_cali, col="yellow")
           
-#------------------------------------------------------ Bathrooms (k-vecinos)  ----------------------------------------------------------------------------------------------------------------------- 
-# Bgtá
-# Medellín 
-# Cali 
-#------------------------------------------------------------- Texto ---------------------------------------------------------------------------------------------------------------------- 
-#Garaje/parqueadero 
-# Bgtá
-# Medellín 
-# Cali 
+ 
+
 #--------------------------------------------------------- Calculo variables modelo  ---------------------------------------------------------------------------------------------------------------------- 
 #Train 
 #Test
