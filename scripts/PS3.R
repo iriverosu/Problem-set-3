@@ -7,6 +7,8 @@
     install.packages("sf")
     install.packages("nngeo")
     install.packages("spdep")
+    install.packages("missForest")
+    library(missForest)
     library(spdep)
     library(nngeo)
     library(sf)
@@ -28,7 +30,6 @@
     
     leaflet() %>% addTiles() %>% addCircleMarkers(data=train2)
     class(train2)
-    
   ##Variables
     #1.Área total o cubierta
     #2.bedrooms
@@ -91,13 +92,14 @@
               
               train2<-cbind(train2,noNA$new_surface)
               names(train2)
-              
               'surface_final'->names(train2)[names(train2)=='noNA.new_surface']
     
 #2. Baños---------------------------------------------------------------------------------------------------- 
               train2<-cbind(train2,noNA$bathrooms)
               names(train2)
               'bathrooms_final'->names(train2)[names(train2)=='noNA.bathrooms']
+    #Valores como integrales
+              
 #-------------------------------------------------- Delimitar las ciudades ----------------------------------------------------------------------------------------------------------------------- 
 #----1. Bogotá  -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------  
       ####################### Delimitar Bogotá 
