@@ -876,7 +876,7 @@ leaflet() %>% addTiles() %>% addPolygons(data=Medellin,col="red") %>% addCircles
   train_final <- select(train_final,-property_id, -city)
          
          
-         #
+         
                
 #----3. Cali -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------  
 #-------Distancia universidades
