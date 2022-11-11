@@ -86,8 +86,7 @@
               imp <- missForest(train3, verbose=TRUE, variablewise= TRUE)
               imp$OOBerror #error que tiene
               #        PFC          MSE          MSE          MSE          MSE      MSE          MSE          PFC 
-              #0.000000e+00 9.174375e+05 2.115713e+04 7.770841e+06 3.045758e-02 0.000000e+00 7.647697e-01 0.000000e+00
-
+              # 0.000000e+00 8.265750e+05 1.674749e+04 5.646564e+06 2.094840e-02 0.000000e+00 1.737392e-01 0.000000e+00 
               noNA<-as.data.frame(imp$ximp)
               sum(is.na(noNA$new_surface))#0
               
@@ -100,10 +99,7 @@
               names(train2)
               'bathrooms_final'->names(train2)[names(train2)=='noNA.bathrooms']
    
-#------Valores como enteros
-              
-#------Modificar la base
-        train2<-train2 %>% select(-surface_total,-surface_covered,-rooms, -bathrooms, -title, -description, -operation_type, -new_surface)
+#Valores como enteros
               
 #-------------------------------------------------- Delimitar las ciudades ----------------------------------------------------------------------------------------------------------------------- 
 #----1. Bogotá  -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------  
@@ -865,21 +861,7 @@ leaflet() %>% addTiles() %>% addPolygons(data=Medellin,col="red") %>% addCircles
          min_dist_cai_bog %>% head()
          #pegar a dataframe general
          train_bog$dist_cai = min_dist_cai_bog
-         
-         
-         
-         
-         
-#-------Base definitiva
-  train_bog<-as.data.frame((train_bog))
-  train_medellin<-as.data.frame(train_medellin)
-  train_final <- rbind(train_bog,train_medellin)
-         
-  train_final <- select(train_final,-property_id, -city)
-         
-         
-         
-               
+        
 #----3. Cali -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------  
 #-------Distancia universidades
          train_bog<-subset(train2,city=="Cali")
@@ -973,6 +955,18 @@ leaflet() %>% addTiles() %>% addPolygons(data=Medellin,col="red") %>% addCircles
          train_bog$dist_cai = min_dist_cai_bog
          
          
+         
+         
+#--------------------------------------------------------- Base final train y test  ---------------------------------------------------------------------------------------------------------------------- 
+#-------Base definitiva
+         train_bog<-as.data.frame((train_bog))
+         train_medellin<-as.data.frame(train_medellin)
+         train_final <- rbind(train_bog,train_medellin)
+         
+         train_final <- select(train_final,-property_id, -city)
+         
+#------Modificar la base
+         train2<-train2 %>% select(-surface_total,-surface_covered,-rooms, -bathrooms, -title, -description, -operation_type, -new_surface)
          
 #-------------------------------------------------------------- Modelo ---------------------------------------------------------------------------------------------------------------------- 
 #RF
