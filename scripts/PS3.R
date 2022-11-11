@@ -870,13 +870,12 @@ leaflet() %>% addTiles() %>% addPolygons(data=Medellin,col="red") %>% addCircles
          
          
          
-         #-------Base definitiva
-         train_bog<-as.data.frame((train_bog))
-         train_medellin<-as.data.frame(train_medellin)
+#-------Base definitiva
+  train_bog<-as.data.frame((train_bog))
+  train_medellin<-as.data.frame(train_medellin)
+  train_final <- rbind(train_bog,train_medellin)
          
-         train_final <- rbind(train_bog,train_medellin)
-         
-         train_final <- select(train_final,-property_id, -city)
+  train_final <- select(train_final,-property_id, -city)
          
          
          
