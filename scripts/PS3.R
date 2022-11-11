@@ -865,8 +865,12 @@ leaflet() %>% addTiles() %>% addPolygons(data=Medellin,col="red") %>% addCircles
          min_dist_cai_bog %>% head()
          #pegar a dataframe general
          train_bog$dist_cai = min_dist_cai_bog
-        
-#-------Base definitiva
+         
+         
+         
+         
+         
+         #-------Base definitiva
          train_bog<-as.data.frame((train_bog))
          train_medellin<-as.data.frame(train_medellin)
          
