@@ -29,7 +29,8 @@
                        crs=4326) ## CRS
     
     leaflet() %>% addTiles() %>% addCircleMarkers(data=train2)
-    class(train2)
+    names(train2)
+    
   ##Variables
     #1.Área total o cubierta
     #2.bedrooms
@@ -98,7 +99,11 @@
               train2<-cbind(train2,noNA$bathrooms)
               names(train2)
               'bathrooms_final'->names(train2)[names(train2)=='noNA.bathrooms']
-    #Valores como integrales
+   
+#------Valores como enteros
+              
+#------Modificar la base
+        train2<-train2 %>% select(-surface_total,-surface_covered,-rooms, -bathrooms, -title, -description, -operation_type, -new_surface)
               
 #-------------------------------------------------- Delimitar las ciudades ----------------------------------------------------------------------------------------------------------------------- 
 #----1. Bogotá  -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------  
@@ -127,6 +132,58 @@
       leaflet() %>% addTiles() %>% addPolygons(data=Cali)
 
 
+      
+#-------------------------------------------------- CAI ----------------------------------------------------------------------------------------------------------------------- 
+#----1. Bogotá  -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------  
+      ## Guardamos un amenity con el Poligono que en este caso es bogota con las estaciones de Policia 
+      osm_p = opq(bbox = getbb("Bogotá Colombia")) %>%
+        add_osm_feature(key="amenity" , value="police") 
+      ## Fijamos un objeto
+      osm_sfp = osm_p %>% osmdata_sf()
+      osm_sfp
+      police_bog = osm_sfp$osm_points %>% select(osm_id) 
+      police_bog
+      ### Si queremos visualizarlo
+      leaflet() %>% addTiles() %>% addCircleMarkers(data=police_bog, col="red")
+      ## Interceptando oficinas con Bogotá
+      police_bog$intercep <- st_intersects(police_bog, Bogota,sparse=FALSE)[,1]
+      police_bog<- police_bog[police_bog$intercep == TRUE, ]
+      leaflet() %>% addTiles() %>% addPolygons(data=Bogota,col="red") %>% addCircles(data=police_bog, col="black")
+      table(police_bog$intercep)
+      
+      
+#----2. Medellín  -----------------------------------------------------------------------------------------------------------------------------------
+      osm_p3 = opq(bbox = getbb("Medellín Colombia")) %>%
+        add_osm_feature(key="amenity" , value="police") 
+      ## Fijamos un objeto
+      osm_sfp3 = osm_p3 %>% osmdata_sf()
+      osm_sfp3
+      police_med = osm_sfp3$osm_points %>% select(osm_id) 
+      police_med
+      ### Si queremos visualizarlo
+      leaflet() %>% addTiles() %>% addCircleMarkers(data=police_med, col="red")
+      ## Interceptando CAIS con Medellín
+      police_med$intercep <- st_intersects(police_med, Medellin,sparse=FALSE)[,1]
+      police_med<- police_med[police_med$intercep == TRUE, ]
+      leaflet() %>% addTiles() %>% addPolygons(data=Medellin,col="red") %>% addCircles(data=police_med, col="black")
+      table(police_med$intercep)
+      
+#----3. Cali  -----------------------------------------------------------------------------------------------------------------------------------
+      osm_p2 = opq(bbox = getbb("Cali Colombia")) %>%
+        add_osm_feature(key="amenity" , value="police") 
+      ## Fijamos un objeto
+      osm_sfp2 = osm_p2 %>% osmdata_sf()
+      osm_sfp2
+      
+      police_cali = osm_sfp2$osm_points %>% select(osm_id) 
+      police_cali
+      ### Si queremos visualizarlo
+      leaflet() %>% addTiles() %>% addCircleMarkers(data=police_cali, col="red")
+      ## Interceptando CAIS con Cali
+      police_cali$intercep <- st_intersects(police_cali, Cali,sparse=FALSE)[,1]
+      police_cali<- police_cali[police_cali$intercep == TRUE, ]
+      leaflet() %>% addTiles() %>% addPolygons(data=Cali,col="red") %>% addCircles(data=police_cali, col="black")
+      table(police_cali$intercep)
 #-----------------------------------------------CBD (office, retail e industrial) ----------------------------------------------------------------------------------------------------------------------------------------------------
 #----1. Bogotá  -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------  
 ####################### Delimitar Bogotá 
@@ -615,11 +672,11 @@ leaflet() %>% addTiles() %>% addPolygons(data=Medellin,col="red") %>% addCircles
          house_chapi$dist_parque = mean_dist_parque
         
  
- #----1. Bogotá  -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------  
+#----1. Bogotá  -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------  
  11001
- #----2. Medellín  -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------  
+#----2. Medellín  -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------  
  05001
- #----3. Cali -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------  
+#----3. Cali -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------  
  76001
 #--------------------------------------------------------- Calculo variables modelo  ---------------------------------------------------------------------------------------------------------------------- 
 #----1. Medellín  -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------  
@@ -656,24 +713,23 @@ leaflet() %>% addTiles() %>% addPolygons(data=Medellin,col="red") %>% addCircles
 
 #-------Distancia estaciones de bus
          ## Distancia a muchos puntos
-         matrix_dist_kin_med <- st_distance(x=train_medellin , y=kinder_med)
-         matrix_dist_kin_med[1:5,1:5]
+         matrix_dist_bus_med <- st_distance(x=train_medellin , y=bus_med)
+         matrix_dist_bus_med[1:5,1:5]
          #Distancia al punto más cercano
-         min_dist_kin_med <- apply(matrix_dist_kin_med , 1 , min)
-         min_dist_kin_med %>% head()
+         min_dist_bus_med <- apply(matrix_dist_bus_med , 1 , min)
+         min_dist_bus_med %>% head()
          #pegar a dataframe general
-         train_medellin$dist_kin = min_dist_kin_med
+         train_medellin$dist_bus = min_dist_bus_med
          
 #-------Distancia vías principales
          ## Distancia a muchos puntos
-         matrix_dist_kin_med <- st_distance(x=train_medellin , y=kinder_med)
-         matrix_dist_kin_med[1:5,1:5]
+         matrix_dist_vias_med <- st_distance(x=train_medellin , y=vias_med)
+         matrix_dist_vias_med[1:5,1:5]
          #Distancia al punto más cercano
-         min_dist_kin_med <- apply(matrix_dist_kin_med , 1 , min)
-         min_dist_kin_med %>% head()
+         min_dist_vias_med <- apply(matrix_dist_vias_med , 1 , min)
+         min_dist_vias_med %>% head()
          #pegar a dataframe general
-         train_medellin$dist_kin = min_dist_kin_med
-         
+         train_medellin$dist_vias = min_dist_vias_med
 #-------Distancia office
          ## Distancia a muchos puntos
          matrix_dist_off_med <- st_distance(x=train_medellin , y=office_med)
@@ -704,15 +760,218 @@ leaflet() %>% addTiles() %>% addPolygons(data=Medellin,col="red") %>% addCircles
          #pegar a dataframe general
          train_medellin$dist_ret = min_dist_ret_med
          
+#-------Distancia CAI
+         ## Distancia a muchos puntos
+         matrix_dist_cai_med <- st_distance(x=train_medellin , y=police_med)
+         matrix_dist_cai_med[1:5,1:5]
+         #Distancia al punto más cercano
+         min_dist_cai_med <- apply(matrix_dist_cai_med , 1 , min)
+         min_dist_cai_med %>% head()
+         #pegar a dataframe general
+         train_medellin$dist_cai = min_dist_cai_med
          
          
          
-         
-#Test
+
          
 #----2. Bogotá  -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------  
-      
+#-------Distancia universidades
+         train_bog<-subset(train2,city=="Bogotá D.C")
+         ## Distancia a muchos puntos
+         matrix_dist_uni_bog <- st_distance(x=train_bog , y=universidades_bog)
+         matrix_dist_uni_bog[1:5,1:5]
+         #Distancia al punto más cercano
+         min_dist_uni_bog <- apply(matrix_dist_uni_bog , 1 , min)
+         min_dist_uni_bog %>% head()
+         #pegar a dataframe general
+         train_bog$dist_uni = min_dist_uni_bog
+         
+#-------Distancia colegios
+         ## Distancia a muchos puntos
+         matrix_dist_col_bog <- st_distance(x=train_bog , y=colegios_bog)
+         matrix_dist_col_bog[1:5,1:5]
+         #Distancia al punto más cercano
+         min_dist_col_bog <- apply(matrix_dist_col_bog , 1 , min)
+         min_dist_col_bog %>% head()
+         #pegar a dataframe general
+         train_bog$dist_col = min_dist_col_bog
+         
+#-------Distancia kindergarden
+         ## Distancia a muchos puntos
+         matrix_dist_kin_bog <- st_distance(x=train_bog , y=kinder_bog)
+         matrix_dist_kin_bog[1:5,1:5]
+         #Distancia al punto más cercano
+         min_dist_kin_bog <- apply(matrix_dist_kin_bog , 1 , min)
+         min_dist_kin_bog %>% head()
+         #pegar a dataframe general
+         train_bog$dist_kin = min_dist_kin_bog
+         
+#-------Distancia estaciones de bus
+         ## Distancia a muchos puntos
+         matrix_dist_bus_bog <- st_distance(x=train_bog , y=bus_bog)
+         matrix_dist_bus_bog[1:5,1:5]
+         #Distancia al punto más cercano
+         min_dist_bus_bog <- apply(matrix_dist_bus_bog , 1 , min)
+         min_dist_bus_bog %>% head()
+         #pegar a dataframe general
+         train_bog$dist_bus = min_dist_bus_bog
+         
+#-------Distancia vías principales
+         ## Distancia a muchos puntos
+         matrix_dist_vias_bog <- st_distance(x=train_bog , y=vias_bog)
+         matrix_dist_vias_bog[1:5,1:5]
+         #Distancia al punto más cercano
+         min_dist_vias_bog <- apply(matrix_dist_vias_bog , 1 , min)
+         min_dist_vias_bog %>% head()
+         #pegar a dataframe general
+         train_bog$dist_vias = min_dist_vias_bog
+         
+#-------Distancia office
+         ## Distancia a muchos puntos
+         matrix_dist_off_bog <- st_distance(x=train_bog , y=office_bog)
+         matrix_dist_off_bog[1:5,1:5]
+         #Distancia al punto más cercano
+         min_dist_off_bog <- apply(matrix_dist_off_bog , 1 , min)
+         min_dist_off_bog %>% head()
+         #pegar a dataframe general
+         train_bog$dist_off = min_dist_off_bog
+         
+#-------Distancia Industrial
+         ## Distancia a muchos puntos
+         matrix_dist_ind_bog <- st_distance(x=train_bog , y=industrial_bog)
+         matrix_dist_ind_bog[1:5,1:5]
+         #Distancia al punto más cercano
+         min_dist_ind_bog <- apply(matrix_dist_ind_bog , 1 , min)
+         min_dist_ind_bog %>% head()
+         #pegar a dataframe general
+         train_bog$dist_ind = min_dist_ind_bog
+         
+#-------Distancia retail
+         ## Distancia a muchos puntos
+         matrix_dist_ret_bog <- st_distance(x=train_bog , y=retail_bog)
+         matrix_dist_ret_bog[1:5,1:5]
+         #Distancia al punto más cercano
+         min_dist_ret_bog <- apply(matrix_dist_ret_bog , 1 , min)
+         min_dist_ret_bog %>% head()
+         #pegar a dataframe general
+         train_bog$dist_ret = min_dist_ret_bog
+         
+#-------Distancia CAI
+         ## Distancia a muchos puntos
+         matrix_dist_cai_bog <- st_distance(x=train_bog , y=police_bog)
+         matrix_dist_cai_bog[1:5,1:5]
+         #Distancia al punto más cercano
+         min_dist_cai_bog <- apply(matrix_dist_cai_bog , 1 , min)
+         min_dist_cai_bog %>% head()
+         #pegar a dataframe general
+         train_bog$dist_cai = min_dist_cai_bog
+        
+         
+#-------Base definitiva
+  train_bog<-as.data.frame((train_bog))
+  train_medellin<-as.data.frame(train_medellin)
+         
+  train_final <- rbind(train_bog,train_medellin)
+         
+  train_final <- select(train_final,-property_id, -city)
+         
+         
+         #
+               
 #----3. Cali -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------  
+#-------Distancia universidades
+         train_bog<-subset(train2,city=="Cali")
+         ## Distancia a muchos puntos
+         matrix_dist_uni_bog <- st_distance(x=train_bog , y=universidades_bog)
+         matrix_dist_uni_bog[1:5,1:5]
+         #Distancia al punto más cercano
+         min_dist_uni_bog <- apply(matrix_dist_uni_bog , 1 , min)
+         min_dist_uni_bog %>% head()
+         #pegar a dataframe general
+         train_bog$dist_uni = min_dist_uni_bog
+         
+#-------Distancia colegios
+         ## Distancia a muchos puntos
+         matrix_dist_col_bog <- st_distance(x=train_bog , y=colegios_bog)
+         matrix_dist_col_bog[1:5,1:5]
+         #Distancia al punto más cercano
+         min_dist_col_bog <- apply(matrix_dist_col_bog , 1 , min)
+         min_dist_col_bog %>% head()
+         #pegar a dataframe general
+         train_bog$dist_col = min_dist_col_bog
+         
+#-------Distancia kindergarden
+         ## Distancia a muchos puntos
+         matrix_dist_kin_bog <- st_distance(x=train_bog , y=kinder_bog)
+         matrix_dist_kin_bog[1:5,1:5]
+         #Distancia al punto más cercano
+         min_dist_kin_bog <- apply(matrix_dist_kin_bog , 1 , min)
+         min_dist_kin_bog %>% head()
+         #pegar a dataframe general
+         train_bog$dist_kin = min_dist_kin_bog
+         
+#-------Distancia estaciones de bus
+         ## Distancia a muchos puntos
+         matrix_dist_bus_bog <- st_distance(x=train_bog , y=bus_bog)
+         matrix_dist_bus_bog[1:5,1:5]
+         #Distancia al punto más cercano
+         min_dist_bus_bog <- apply(matrix_dist_bus_bog , 1 , min)
+         min_dist_bus_bog %>% head()
+         #pegar a dataframe general
+         train_bog$dist_bus = min_dist_bus_bog
+         
+#-------Distancia vías principales
+         ## Distancia a muchos puntos
+         matrix_dist_vias_bog <- st_distance(x=train_bog , y=vias_bog)
+         matrix_dist_vias_bog[1:5,1:5]
+         #Distancia al punto más cercano
+         min_dist_vias_bog <- apply(matrix_dist_kin_bog , 1 , min)
+         min_dist_vias_bog %>% head()
+         #pegar a dataframe general
+         train_bog$dist_vias = min_dist_vias_bog
+         
+#-------Distancia office
+         ## Distancia a muchos puntos
+         matrix_dist_off_bog <- st_distance(x=train_bog , y=office_bog)
+         matrix_dist_off_bog[1:5,1:5]
+         #Distancia al punto más cercano
+         min_dist_off_bog <- apply(matrix_dist_off_bog , 1 , min)
+         min_dist_off_bog %>% head()
+         #pegar a dataframe general
+         train_bog$dist_off = min_dist_off_bog
+         
+#-------Distancia Industrial
+         ## Distancia a muchos puntos
+         matrix_dist_ind_bog <- st_distance(x=train_bog , y=industrial_bog)
+         matrix_dist_ind_bog[1:5,1:5]
+         #Distancia al punto más cercano
+         min_dist_ind_bog <- apply(matrix_dist_ind_bog , 1 , min)
+         min_dist_ind_bog %>% head()
+         #pegar a dataframe general
+         train_bog$dist_ind = min_dist_ind_bog
+         
+#-------Distancia retail
+         ## Distancia a muchos puntos
+         matrix_dist_ret_bog <- st_distance(x=train_bog , y=retail_bog)
+         matrix_dist_ret_bog[1:5,1:5]
+         #Distancia al punto más cercano
+         min_dist_ret_bog <- apply(matrix_dist_ret_bog , 1 , min)
+         min_dist_ret_bog %>% head()
+         #pegar a dataframe general
+         train_bog$dist_ret = min_dist_ret_bog
+         
+#-------Distancia CAI
+         ## Distancia a muchos puntos
+         matrix_dist_cai_bog <- st_distance(x=train_bog , y=police_bog)
+         matrix_dist_cai_bog[1:5,1:5]
+         #Distancia al punto más cercano
+         min_dist_cai_bog <- apply(matrix_dist_cai_bog , 1 , min)
+         min_dist_cai_bog %>% head()
+         #pegar a dataframe general
+         train_bog$dist_cai = min_dist_cai_bog
+         
+         
+         
 #-------------------------------------------------------------- Modelo ---------------------------------------------------------------------------------------------------------------------- 
 #RF
 #Pruebas 
