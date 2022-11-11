@@ -584,8 +584,7 @@ leaflet() %>% addTiles() %>% addPolygons(data=Medellin,col="red") %>% addCircles
  
 
 #------------------------------------------------------  IPM ---------------------------------------------------------------------------------------------------------------------- 
-         IPM<- st_read(
-           "C:/Users/HP/Downloads/OSM/VULNRB_IPMxMZ.shp")
+         IPM<- st_read("C:/Users/HP/Downloads/OSM/VULNRB_IPMxMZ.shp")
          DATAIPM <- as.data.frame("IPMcali")
          muestra2 <- st_as_sf(x = muestra2, ## datos
                               coords=c("lon","lat"), ## coordenadas
@@ -594,56 +593,27 @@ leaflet() %>% addTiles() %>% addPolygons(data=Medellin,col="red") %>% addCircles
          class(muestra2)
          dir <- system.file("shape", package="sf")
          list.files(dir, pattern="^[nc]")
-         plot(IPM2)
-         ## Cambiamos el Sistema de Coordenadas de IPM2
-         st_transform(IPM2, "WGS84") 
-         ## Cambiamos el Sistema de Coordenadas de IPM2
-         st_transform(muestra2, 4326) 
-         st_crs(muestra2) == st_crs(train2)
-         st_crs(train2)
-         train2
-         st_transform(muestra2, crs=4326)
-         ####
-         muestra2 <- subset(IPM2, (IPM2$COD_MPIO=="05001" | IPM2$COD_MPIO=="11001" | IPM2$COD_MPIO=="76001"))
-         table(muestra2$COD_MPIO)
-         leaflet() %>% addTiles() %>% addCircleMarkers(data=train2,color="red") %>% addPolygons(data=muestra2, color="blue")
-         class(train2)
-         leaflet() %>% addTiles() %>% addPolygons(data=muestra2, color="blue")
-         ## Cambiamos el Sistema de Coordenadas de IPM2
-         st_transform(IPM2, "WGS84") 
+    
          ## Cambiamos el Sistema de Coordenadas de IPM2
          muestra2 = st_transform(muestra2, "EPSG:4326" )  ### Version Correcta
          st_crs(muestra2) == st_crs(train2)
-         st_crs(train2)
-         st_transform(muestra2, crs=4326)
+         
          ####
          muestra2 <- subset(IPM2, (IPM2$COD_MPIO=="05001" | IPM2$COD_MPIO=="11001" | IPM2$COD_MPIO=="76001"))
          table(muestra2$COD_MPIO)
-         st_crs(muestra2)
          
          ################## Unir train2 y muestra2
          
          base_final <- st_join(train2,muestra2)
          sum (is.na(base_final$ipm))
-         aaa <- st_nearest_feature(new_house2$geometry[1], muestra2$geometry,pairwise=TRUE)
-         sum(is.na(new_house$ipm.x))
-         st_nearest_points()
-         new_house <- base_final[c(1:200),]
-         new_house2 <- subset(base_final, is.na(base_final$ipm == T) )
-         new_house2 <- base_final[c(1:3),]
-         new_mnz = muestra2
-         leaflet() %>% addTiles() %>% addPolygons(data=new_mnz,col="red") %>% addCircles(data=new_house2)
-         table(new_house$city)
-         new_house <- st_join(x=new_house, y=new_mnz, join=st_nn, maxdist=20, k=1, progress=T)
-         new_house2 <- st_join(x=new_house2, y=new_mnz, join=st_nn, maxdist=20, k=1, progress=T)
-         ##
-         new_house_sp <- new_house %>% st_buffer(20) %>% as_Spatial()
-         nb_house = poly2nb(pl=new_house_sp, queen=T)
-         nb_house[[1]]
-         leaflet() %>% addTiles() %>% addCircles(data=new_house[32,],col="red") %>% addCircles(data=new_house[nb_house[[1]],])
-         new_house$rooms[1]
-         new_house$rooms[nb_house[[1]]]
-         mean(new_house$rooms[nb_house[[1]]],na.rm=T)
+         na_houses<-subset(base_final, is.na(base_final$ipm==T))
+         ## Distancia a muchos polygonos
+         matrix_dist_mnz<- st_nearest_points(x=na_houses , y=muestra2)
+         matrix_dist_parque[1:5,1:5]
+         mean_dist_parque <- apply(matrix_dist_parque , 1 , mean)
+         mean_dist_parque %>% head()
+         house_chapi$dist_parque = mean_dist_parque
+        
  
  #----1. Bogotá  -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------  
  11001
@@ -685,7 +655,24 @@ leaflet() %>% addTiles() %>% addPolygons(data=Medellin,col="red") %>% addCircles
          train_medellin$dist_kin = min_dist_kin_med
 
 #-------Distancia estaciones de bus
+         ## Distancia a muchos puntos
+         matrix_dist_kin_med <- st_distance(x=train_medellin , y=kinder_med)
+         matrix_dist_kin_med[1:5,1:5]
+         #Distancia al punto más cercano
+         min_dist_kin_med <- apply(matrix_dist_kin_med , 1 , min)
+         min_dist_kin_med %>% head()
+         #pegar a dataframe general
+         train_medellin$dist_kin = min_dist_kin_med
+         
 #-------Distancia vías principales
+         ## Distancia a muchos puntos
+         matrix_dist_kin_med <- st_distance(x=train_medellin , y=kinder_med)
+         matrix_dist_kin_med[1:5,1:5]
+         #Distancia al punto más cercano
+         min_dist_kin_med <- apply(matrix_dist_kin_med , 1 , min)
+         min_dist_kin_med %>% head()
+         #pegar a dataframe general
+         train_medellin$dist_kin = min_dist_kin_med
          
 #-------Distancia office
          ## Distancia a muchos puntos
@@ -726,7 +713,6 @@ leaflet() %>% addTiles() %>% addPolygons(data=Medellin,col="red") %>% addCircles
 #----2. Bogotá  -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------  
       
 #----3. Cali -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------  
-         
 #-------------------------------------------------------------- Modelo ---------------------------------------------------------------------------------------------------------------------- 
 #RF
 #Pruebas 
