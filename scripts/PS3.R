@@ -8,6 +8,7 @@
     install.packages("nngeo")
     install.packages("spdep")
     install.packages("missForest")
+    library(tidyverse)
     library(missForest)
     library(spdep)
     library(nngeo)
@@ -30,6 +31,14 @@
     
     leaflet() %>% addTiles() %>% addCircleMarkers(data=train2)
     names(train2)
+    
+    test <- st_as_sf(x = test, ## datos
+                       coords=c("lon","lat"), ## coordenadas
+                       crs=4326) ## CRS
+    
+    leaflet() %>% addTiles() %>% addCircleMarkers(data=test)
+    names(test)
+    
     
   ##Variables
     #1.Área total o cubierta
@@ -101,6 +110,63 @@
    
 #Valores como enteros
               
+#3  Modificar la base----------------------------------------------------------------------------------------------------------------
+    train2<-train2 %>% select(-surface_total,-surface_covered,-rooms, -bathrooms, -title, -description, -operation_type, -new_surface)
+    train2<-train2 %>% select(-bathrooms, -title, -description, -operation_type, -new_surface)
+              
+  
+#1. Área total tes----------------------------------------------------------------------------------------------------
+    #----------1.1 Texto 
+    
+    x <- "[:space:]+[:digit:]+[:punct:]+[:digit:]+[:space:]+"
+    str_locate_all(string = test$description , pattern = x) ## detect pattern
+    str_extract(string = test$description , pattern= x) ## extrac pattern
+    
+    test <- test %>% 
+      mutate(new_surface = str_extract(string=description , pattern= x))
+    table(test$new_surface) %>% sort() %>% head()
+    sum(is.na(test$new_surface))
+    test$new_surface<-as.numeric(test$new_surface)
+    test$new_surface<-(ifelse(test$new_surface >30.15,test$new_surface,NA))
+    
+    test$new_surface<-(ifelse((is.na(test$surface_total)),test$new_surface,test$surface_total))
+    sum(is.na(test$surface_total))#3146
+    sum(is.na(test$new_surface))#3005
+    test$new_surface<-(ifelse((is.na(test$new_surface)),test$surface_covered,test$new_surface))
+    sum(is.na(test$new_surface))#2723
+    
+    ----------#1.2 imputacion missings con arboles
+    test$city<-as.factor(test$city)
+    test$property_type<-as.factor(test$property_type)
+    test$operation_type<-as.factor(test$operation_type)
+    test$property_id<- as.numeric(test$property_id)
+    
+    class(test)
+    test2<-as.data.frame(test)
+    test2<-as.data.frame(test2)
+    test2<- test2 %>% select(city, surface_total,surface_covered,new_surface,rooms, bedrooms,bathrooms, property_type)
+    
+    imp2 <- missForest(test2, verbose=TRUE, variablewise= TRUE)
+    imp2$OOBerror #error que tiene
+    #        PFC          MSE          MSE          MSE          MSE      MSE          MSE          PFC 
+    #0.000000e+00 2.712978e+05 1.266396e+05 7.210981e+07 5.218208e-02 0.000000e+00 5.560255e-01 0.000000e+00     
+    noNA<-as.data.frame(imp2$ximp)
+    sum(is.na(noNA$new_surface))#0
+    
+    test<-cbind(test,noNA$new_surface)
+    names(test)
+    'surface_final'->names(test)[names(test)=='noNA.new_surface']
+    
+#2. Baños test --------------------------------------------------------------------------------------------------- 
+    test<-cbind(test,noNA$bathrooms)
+    names(test)
+    'bathrooms_final'->names(test)[names(test)=='noNA.bathrooms']
+    
+    #Valores como enteros
+    
+#3  Modificar la base test ----------------------------------------------------------------------------------------------------------------
+    test<-test %>% select(-surface_total,-surface_covered,-rooms, -bathrooms, -title, -description, -operation_type, -new_surface)
+
 #-------------------------------------------------- Delimitar las ciudades ----------------------------------------------------------------------------------------------------------------------- 
 #----1. Bogotá  -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------  
       ####################### Delimitar Bogotá 
@@ -864,109 +930,102 @@ leaflet() %>% addTiles() %>% addPolygons(data=Medellin,col="red") %>% addCircles
         
 #----3. Cali -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------  
 #-------Distancia universidades
-         train_bog<-subset(train2,city=="Cali")
          ## Distancia a muchos puntos
-         matrix_dist_uni_bog <- st_distance(x=train_bog , y=universidades_bog)
-         matrix_dist_uni_bog[1:5,1:5]
+         matrix_dist_uni_cali <- st_distance(x=test , y=universidades_cali)
+         matrix_dist_uni_cali[1:5,1:5]
          #Distancia al punto más cercano
-         min_dist_uni_bog <- apply(matrix_dist_uni_bog , 1 , min)
-         min_dist_uni_bog %>% head()
+         min_dist_uni_cali <- apply(matrix_dist_uni_cali , 1 , min)
+         min_dist_uni_cali%>% head()
          #pegar a dataframe general
-         train_bog$dist_uni = min_dist_uni_bog
-         
+         test$dist_uni = min_dist_uni_cali
 #-------Distancia colegios
          ## Distancia a muchos puntos
-         matrix_dist_col_bog <- st_distance(x=train_bog , y=colegios_bog)
-         matrix_dist_col_bog[1:5,1:5]
+         matrix_dist_col_cali <- st_distance(x=test , y=colegios_cali)
+         matrix_dist_col_cali[1:5,1:5]
          #Distancia al punto más cercano
-         min_dist_col_bog <- apply(matrix_dist_col_bog , 1 , min)
-         min_dist_col_bog %>% head()
+         min_dist_col_cali <- apply(matrix_dist_col_cali , 1 , min)
+         min_dist_col_cali%>% head()
          #pegar a dataframe general
-         train_bog$dist_col = min_dist_col_bog
+         test$dist_col = min_dist_col_cali
          
 #-------Distancia kindergarden
          ## Distancia a muchos puntos
-         matrix_dist_kin_bog <- st_distance(x=train_bog , y=kinder_bog)
-         matrix_dist_kin_bog[1:5,1:5]
+         matrix_dist_kin_cali <- st_distance(x=test , y=kinder_cali)
+         matrix_dist_kin_cali[1:5,1:5]
          #Distancia al punto más cercano
-         min_dist_kin_bog <- apply(matrix_dist_kin_bog , 1 , min)
-         min_dist_kin_bog %>% head()
+         min_dist_kin_cali <- apply(matrix_dist_kin_cali , 1 , min)
+         min_dist_kin_cali %>% head()
          #pegar a dataframe general
-         train_bog$dist_kin = min_dist_kin_bog
+         test$dist_kin = min_dist_kin_cali
          
 #-------Distancia estaciones de bus
          ## Distancia a muchos puntos
-         matrix_dist_bus_bog <- st_distance(x=train_bog , y=bus_bog)
-         matrix_dist_bus_bog[1:5,1:5]
+         matrix_dist_bus_cali <- st_distance(x=test , y=bus_cali)
+         matrix_dist_bus_cali[1:5,1:5]
          #Distancia al punto más cercano
-         min_dist_bus_bog <- apply(matrix_dist_bus_bog , 1 , min)
-         min_dist_bus_bog %>% head()
+         min_dist_bus_cali <- apply(matrix_dist_bus_cali , 1 , min)
+         min_dist_bus_cali%>% head()
          #pegar a dataframe general
-         train_bog$dist_bus = min_dist_bus_bog
+         test$dist_bus = min_dist_bus_cali
          
 #-------Distancia vías principales
          ## Distancia a muchos puntos
-         matrix_dist_vias_bog <- st_distance(x=train_bog , y=vias_bog)
-         matrix_dist_vias_bog[1:5,1:5]
+         matrix_dist_vias_cali <- st_distance(x=test , y=vias_cali)
+         matrix_dist_vias_cali[1:5,1:5]
          #Distancia al punto más cercano
-         min_dist_vias_bog <- apply(matrix_dist_kin_bog , 1 , min)
-         min_dist_vias_bog %>% head()
+         min_dist_vias_cali <- apply(matrix_dist_kin_cali , 1 , min)
+         min_dist_vias_cali%>% head()
          #pegar a dataframe general
-         train_bog$dist_vias = min_dist_vias_bog
+         test$dist_vias = min_dist_vias_cali
          
 #-------Distancia office
          ## Distancia a muchos puntos
-         matrix_dist_off_bog <- st_distance(x=train_bog , y=office_bog)
-         matrix_dist_off_bog[1:5,1:5]
+         matrix_dist_off_cali <- st_distance(x=test , y=office_cali)
+         matrix_dist_off_cali[1:5,1:5]
          #Distancia al punto más cercano
-         min_dist_off_bog <- apply(matrix_dist_off_bog , 1 , min)
-         min_dist_off_bog %>% head()
+         min_dist_off_cali <- apply(matrix_dist_off_cali , 1 , min)
+         min_dist_off_cali %>% head()
          #pegar a dataframe general
-         train_bog$dist_off = min_dist_off_bog
+         test$dist_off = min_dist_off_cali
          
 #-------Distancia Industrial
          ## Distancia a muchos puntos
-         matrix_dist_ind_bog <- st_distance(x=train_bog , y=industrial_bog)
-         matrix_dist_ind_bog[1:5,1:5]
+         matrix_dist_ind_cali <- st_distance(x=test, y=industrial_cali)
+         matrix_dist_ind_cali[1:5,1:5]
          #Distancia al punto más cercano
-         min_dist_ind_bog <- apply(matrix_dist_ind_bog , 1 , min)
-         min_dist_ind_bog %>% head()
+         min_dist_ind_cali<- apply(matrix_dist_ind_cali , 1 , min)
+         min_dist_ind_cali %>% head()
          #pegar a dataframe general
-         train_bog$dist_ind = min_dist_ind_bog
+         test$dist_ind = min_dist_ind_cali
          
 #-------Distancia retail
          ## Distancia a muchos puntos
-         matrix_dist_ret_bog <- st_distance(x=train_bog , y=retail_bog)
-         matrix_dist_ret_bog[1:5,1:5]
+         matrix_dist_ret_cali <- st_distance(x=test , y=retail_cali)
+         matrix_dist_ret_cali[1:5,1:5]
          #Distancia al punto más cercano
-         min_dist_ret_bog <- apply(matrix_dist_ret_bog , 1 , min)
-         min_dist_ret_bog %>% head()
+         min_dist_ret_cali <- apply(matrix_dist_ret_cali , 1 , min)
+         min_dist_ret_cali %>% head()
          #pegar a dataframe general
-         train_bog$dist_ret = min_dist_ret_bog
+         test$dist_ret = min_dist_ret_cali
          
 #-------Distancia CAI
          ## Distancia a muchos puntos
-         matrix_dist_cai_bog <- st_distance(x=train_bog , y=police_bog)
-         matrix_dist_cai_bog[1:5,1:5]
+         matrix_dist_cai_cali <- st_distance(x=test , y=police_cali)
+         matrix_dist_cai_cali[1:5,1:5]
          #Distancia al punto más cercano
-         min_dist_cai_bog <- apply(matrix_dist_cai_bog , 1 , min)
-         min_dist_cai_bog %>% head()
+         min_dist_cai_cali <- apply(matrix_dist_cai_cali , 1 , min)
+         min_dist_cai_cali %>% head()
          #pegar a dataframe general
-         train_bog$dist_cai = min_dist_cai_bog
-         
-         
-         
+         test$dist_cai = min_dist_cai_cali
          
 #--------------------------------------------------------- Base final train y test  ---------------------------------------------------------------------------------------------------------------------- 
-#-------Base definitiva
+#-------Base definitiva train
          train_bog<-as.data.frame((train_bog))
          train_medellin<-as.data.frame(train_medellin)
          train_final <- rbind(train_bog,train_medellin)
          
          train_final <- select(train_final,-property_id, -city)
          
-#------Modificar la base
-         train2<-train2 %>% select(-surface_total,-surface_covered,-rooms, -bathrooms, -title, -description, -operation_type, -new_surface)
          
 #-------------------------------------------------------------- Modelo ---------------------------------------------------------------------------------------------------------------------- 
 #RF
