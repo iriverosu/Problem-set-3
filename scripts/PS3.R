@@ -1235,7 +1235,7 @@ leaflet() %>% addTiles() %>% addPolygons(data=Medellin,col="red") %>% addCircles
                         y_hat_outsample2 = predict(modeloRF, newdata = predicciones_general_t)
                         
          
-#----4.SP L ------------------------------------------
+#----4.SP L ---------------------------------------------
          
 #Pruebas 
          
