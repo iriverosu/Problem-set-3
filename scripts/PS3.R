@@ -1025,9 +1025,551 @@ leaflet() %>% addTiles() %>% addPolygons(data=Medellin,col="red") %>% addCircles
          train_final <- rbind(train_bog,train_medellin)
          
          train_final <- select(train_final,-property_id, -city)
+
+#-------División de muestra train y test (de Bog y Med)
+         
+         set.seed(12345) 
+         train_final <- train_final %>%
+           mutate(holdout= as.logical(1:nrow(train_final) %in%
+                                        sample(nrow(train_final), nrow(train_final)*.2)))
+         test_rf<-train_final[train_hfinal$holdout==T,] #32.992
+         train_rf<-train_final[train_final$holdout==F,] #131.968
          
          
 #-------------------------------------------------------------- Modelo ---------------------------------------------------------------------------------------------------------------------- 
-#RF
+#----1.O L S ----------------------------------------------------------------------------------------------------------------
+         set.seed(12345)
+         ols <- train(log_ing_per~ Tipo_vivienda+ rs_jefe_hogar+edu_jefe_hogar+ Ncuartos + Ncuartos_dormir+ 
+                        Nper+Npersug+ hacinamiento+edad_jefe_hogar+Horas_trabajo1+Horas_trabajo2+
+                        arriendo_estimado+ocupacion_jefe_hogar+Dominio+subsidio+sexo_jefe_hogar, # model to fit
+                      data = train,
+                      trControl = trainControl(method = "cv", number = 10),
+                      method = "lm")
+         
+         ols$results
+         #intercept      RMSE  Rsquared      MAE    RMSESD  RsquaredSD       MAESD
+         #1      TRUE 1.036285 0.3469095 0.538377 0.0333237 0.008536496 0.007743297
+
+#-----2.Gráfico de coeficientes OLS 
+         
+         df_coeficientes_reg2 <- ols$finalModel$coefficients %>%
+           enframe(name = "predictor", value = "coeficiente")
+         
+         df_coeficientes_reg2[-1,] %>%
+           filter(predictor != "`(Intercept)`") %>%
+           ggplot(aes(x = reorder(predictor, abs(coeficiente)), 
+                      y = coeficiente)) +
+           geom_col(fill = "darkblue") +
+           coord_flip() +
+           labs(title = "Coeficientes del modelo de regresión", 
+                x = "Variables",
+                y = "Coeficientes") +
+           theme_bw()
+        
+#----2.E L A S T I C   N E T --------------------------------------------------            
+         # Model Building : Elastic Net Regression
+         custom <- trainControl(method = "repeatedcv",
+                                number = 10,
+                                repeats = 5,
+                                verboseIter = TRUE)
+         set.seed(12345)
+         en <- train(y_train~.,
+                     data=cbind(x_train,y_train),
+                     method='glmnet',
+                     tuneGrid =expand.grid(alpha=seq(0,1,length=10),
+                                           lambda = seq(0.0001,0.2,length=5)),
+                     trControl=custom)
+         #Resultados 
+         "mean(en$resample$RMSE) 1.036258
+             MSE was used to select the optimal model using the smallest value.
+             The final values used for the model were alpha = 0.6666667 and lambda = 1e-04      "        
+         r22 <- R2_Score(y_pred = predicciones_test, y_true = test$log_ing_per)
+         rmse2 <- RMSE(y_pred = predicciones_test, y_true = test$log_ing_per)
+         mae(test$log_ing_per, predicciones_test)   
+         
+         #Ploting EN
+         plot(en, main = "Elastic Net Regression")
+         #plotting important variables
+         plot(varImp(en,scale=TRUE))
+         
+         
+         #----------Problema de clasificaciòn
+         modelo<- glmnet(
+           x           = x_train,
+           y           = y_train,
+           alpha       = 0.6666667,
+           lambda      = 0.0001,
+           standardize = TRUE
+         )
+         
+         predicciones_train <- predict(modelo, newx = predicciones_general)
+         predicciones_test <- predict(modelo, newx = predicciones_general_t)
+         
+         y_hat_en_insample<-predicciones_train
+         y_hat_en_outsample<-predicciones_test
+         
+         y_hat_en_insample1 <- as.numeric(ifelse(exp(y_hat_en_insample)<train$Lp,1,0))
+         y_hat_en_outsample1 <- as.numeric(ifelse(exp(y_hat_en_outsample)<test$Lp,1,0))
+         
+         #-----------Métricas para matriz 
+         acc_insample1122 <- Accuracy(y_pred = y_hat_en_insample1, y_true = train$Pobre)
+         acc_outsample1122 <- Accuracy(y_pred = y_hat_en_outsample1, y_true = test$Pobre)
+         
+         pre_insample1122 <- Precision(y_pred = y_hat_en_insample1, y_true = train$Pobre, positive = 1)
+         pre_outsample1122 <- Precision(y_pred = y_hat_en_outsample1, y_true = test$Pobre, positive = 1)
+         
+         rec_insample1122<- Recall(y_pred = y_hat_en_insample1, y_true = train$Pobre, positive = 1)
+         rec_outsample1122 <- Recall(y_pred = y_hat_en_outsample1, y_true = test$Pobre, positive = 1)
+         
+         f1_insample1122 <- F1_Score(y_pred = y_hat_en_insample1, y_true = train$Pobre, positive = 1)
+         f1_outsample1122 <- F1_Score(y_pred = y_hat_en_outsample1, y_true = test$Pobre, positive = 1)
+         
+         metricas_insample1122 <- data.frame(Modelo = "Regresión lineal", 
+                                             "Muestreo" = NA, 
+                                             "Evaluación" = "Dentro de muestra",
+                                             "Accuracy" = acc_insample1122,
+                                             "Precision" = pre_insample1122,
+                                             "Recall" = rec_insample1122,
+                                             "F1" = f1_insample1122)
+         
+         metricas_outsample1122 <- data.frame(Modelo = "Regresión lineal", 
+                                              "Muestreo" = NA, 
+                                              "Evaluación" = "Fuera de muestra",
+                                              "Accuracy" = acc_outsample1122,
+                                              "Precision" = pre_outsample1122,
+                                              "Recall" = rec_outsample1122,
+                                              "F1" = f1_outsample1122)
+         
+         metricas1122 <- bind_rows(metricas_insample112, metricas_outsample112)
+         metricas1122
+         
+         Modelo Muestreo        Evaluación  Accuracy Precision    Recall        F1
+         1 Regresión lineal       NA Dentro de muestra 0.8421208 0.6706259 0.4130781 0.5112482
+         2 Regresión lineal       NA  Fuera de muestra 0.8414464 0.6704463 0.4182721 0.5151543
+         
+         ## En
+         en_prob = confusionMatrix(data=factor(y_hat_outsample1) , 
+                                   reference=factor(test$Pobre) , 
+                                   mode="sens_spec" , positive="1")
+         en_prob
+         onfusion Matrix and Statistics
+         
+         Reference
+         Prediction     0     1
+         0 24915  5995
+         1  1433   649
+         
+         Accuracy : 0.7749          
+         95% CI : (0.7703, 0.7794)
+         No Information Rate : 0.7986          
+         P-Value [Acc > NIR] : 1               
+         
+         Kappa : 0.0583          
+         
+         Mcnemars Test P-Value : <2e-16          
+         
+         Sensitivity : 0.09768         
+         Specificity : 0.94561         
+         Pos Pred Value : 0.31172         
+         Neg Pred Value : 0.80605         
+         Prevalence : 0.20138         
+         Detection Rate : 0.01967         
+         Detection Prevalence : 0.06311         
+         Balanced Accuracy : 0.52165         
+         
+         'Positive' Class : 1 
+         
+         
+          
+#----3.R F ------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+         install.packages("ranger")
+         library(ranger)
+         
+         y_train2<-upSampledTrain$Pobre
+         x_train2<-upSampledTrain
+         x_train2<-x_train2[,-62]
+         x_train2<-x_train2[,-61]
+         x_train2<-x_train2[,-60]
+         x_continuas=(upSampledTrain[,c(3,4,6,7,14,18,22,24,26)])
+         x_categoricas=(upSampledTrain[,c(2,5,17,19,20,21,25)])
+         # Ahora procedemos a dummyficar la base
+         x_categoricas<- model.matrix(~ ., x_categoricas) %>%
+           as.data.frame 
+         predicciones_general<- cbind(x_categoricas,x_continuas)
+         
+         #base para reemplazo del modelo
+         x_continuas_t=(test_hogares[c(3,4,6,7,8,9,13,14,15)]
+                        x_continuas_t<-scale(x_continuas_t,center=T,scale=T)
+                        x_categoricas_t=(test_hogares[,c(2,5,10,11,12,16,17)])
+                        
+                        
+                        # Ahora procedemos a dummyficar la base
+                        x_categoricas_t<- model.matrix(~ ., x_categoricas_t) %>%
+                          as.data.frame 
+                        
+                        x_categoricas_t<-x_categoricas_t[,-1]
+                        x_categoricas_t<-cbind(DominioBOGOTA,x_categoricas_t)
+                        predicciones_general_t<- cbind(x_categoricas_t,x_continuas_t)
+                        
+                        
+                        
+                        # Creamos una grilla para tunear el random forest
+                        set.seed(12345)
+                        cv3 <- trainControl(number = 3, method = "cv")
+                        tunegrid_rf <- expand.grid(mtry = c(3, 5, 10), 
+                                                   min.node.size = c(10, 30, 50,
+                                                                     70, 100),
+                                                   splitrule="gini"
+                        )
+                        
+                        modeloRF <- train(y_train2 ~ .,
+                                          data = cbind(y_train2, x_train2), 
+                                          method = "ranger", 
+                                          trControl = cv3,
+                                          metric = 'Recall', 
+                                          verbose = TRUE,
+                                          tuneGrid = tunegrid_rf)
+                        
+                        
+                        # El mejor modelo es aquel que tiene mtry = X y min.node.size = X
+                        y_hat_outsample2 = predict(modeloRF, newdata = predicciones_general_t)
+                        
+         
+#----4.T R E E ------------------------------------------
+         # Convertimos la marca a factor
+         train$Pobre <- factor(train$Pobre)
+         test$Pobre <- factor(test$Pobre)
+         
+         # Creamos modelo
+         modelo <- decision_tree(
+           cost_complexity = tune(),
+           tree_depth = tune(),
+           min_n = tune()
+         ) %>%
+           set_engine("rpart") %>%
+           set_mode("classification")
+         #creamos grilla
+         tree_grid <- crossing(
+           cost_complexity = c(0.0001),
+           min_n = c(2, 14, 27),
+           tree_depth = c(4, 8, 16)
+         )
+         #definimos CV
+         
+         set.seed(666)
+         folds <- vfold_cv(train, strata = Pobre, v = 5)
+         set.seed(666)
+         modelo_cv <- tune_grid(
+           modelo,
+           Pobre ~ hacinamiento
+           +rs_jefe_hogar+subsidio+
+             +arriendo_estimado,
+           resamples = folds,
+           grid = tree_grid,
+           metrics = metric_set(f_meas),
+           control = control_grid(event_level = 'second')
+         )
+         
+         collect_metrics(modelo_cv)
+         autoplot(modelo_cv) + 
+           theme_light() +
+           labs(y = "F1 Score")
+         
+         # Escogemos el mejor modelo
+         modelo <- finalize_model(modelo, select_best(modelo_cv))
+         
+         # Entrenamos el mejor modelo
+         modelo_fit <- fit(modelo, Pobre ~ rs_jefe_hogar+hacinamiento+subsidio+
+                             +arriendo_estimado, train)
+         
+         # Gráfica del modelo
+         fancyRpartPlot(modelo_fit$fit, main = "Árbol con fine tuning", 
+                        sub = "")
+         
+         # Importancia de las variables
+         importancia <- varImp(modelo_fit$fit)
+         importancia <- importancia %>%
+           data.frame() %>%
+           rownames_to_column(var = "Variable") %>%
+           mutate(Porcentaje = Overall/sum(Overall)) %>%
+           filter(Porcentaje > 0) %>%
+           arrange(desc(Porcentaje))
+         
+         ggplot(importancia, aes(x = Porcentaje, 
+                                 y = reorder(Variable, Porcentaje))) +
+           geom_bar(stat = "identity", fill = "darkblue", alpha = 0.8) +
+           labs(y = "Variable") +
+           scale_x_continuous(labels = scales::percent) +
+           theme_classic()
+         
+         # Evaluamos
+         
+         y_hat_insample <- predict(modelo_fit, train)$.pred_class
+         y_hat_outsample <- predict(modelo_fit, test)$.pred_class
+         
+         
+         cm_insample<-confusionMatrix(data=factor(y_hat_insample) , 
+                                      reference=factor(train$Pobre) , 
+                                      mode="sens_spec" )$table
+         
+         
+         cm_outsample<-confusionMatrix(data=factor(y_hat_outsample) , 
+                                       reference=factor(test$Pobre) , 
+                                       mode="sens_spec")$table
+         
+         
+         # Confusion Matrix insample
+         cm_insample
+         # Confusion Matrix outsample
+         cm_outsample
+         
+         #metricas
+         
+         acc_in <- Accuracy(y_true = train$Pobre, y_pred = y_hat_insample)
+         acc_in <- round(100*acc_in, 2)
+         pre_in <- Precision(y_true = train$Pobre, y_pred = y_hat_insample)
+         pre_in <- round(100*pre_in, 2)
+         recall_in <- Recall(y_true = train$Pobre, y_pred = y_hat_insample)
+         recall_in <- round(100*recall_in, 2)
+         f1_in <- F1_Score(y_true = train$Pobre, y_pred = y_hat_insample)
+         f1_in <- round(100*f1_in, 2)
+         
+         acc_out <- Accuracy(y_true = test$Pobre, y_pred = y_hat_outsample)
+         acc_out <- round(100*acc_out, 2)
+         pre_out <- Precision(y_true = test$Pobre, y_pred = y_hat_outsample)
+         pre_out <- round(100*pre_out, 2)
+         recall_out <- Recall(y_true = test$Pobre, y_pred = y_hat_outsample)
+         recall_out <- round(100*recall_out, 2)
+         f1_out <- F1_Score(y_true = test$Pobre, y_pred = y_hat_outsample)
+         f1_out <- round(100*f1_out, 2)
+         
+         resultados <- data.frame(Modelo = "Modelo : Grid search", Base = c("Train", "Test"), 
+                                  Accuracy = c(acc_in, acc_out), 
+                                  Precision = c(pre_in, pre_out),
+                                  Recall = c(recall_in, recall_out),
+                                  F1 = c(f1_in, f1_out))
+         
+         resultados
+         
+         
+         #Modelo  Base Accuracy Precision Recall    F1
+         #1 Modelo : Grid search Train    83.27     85.54  95.18 90.10
+         # 2 Modelo : Grid search  Test    83.00     85.40  94.93 89.92
+         
+         
+         
+         
+         
 #Pruebas 
+         
+         superlearner
+         
+         require("tidyverse")
+         require("ranger")
+         require("SuperLearner")
+         # set the seed for reproducibility
+         set.seed(123)
+         # generate the observed data
+         n = 1000
+         x = runif(n, 0, 8)
+         y = 5 + 4 * sqrt(9 * x) * as.numeric(x <2) + as.numeric(x >= 2) * (abs(x - 6)^(2)) +rlaplace(n)
+         D <- data.frame(x, y) # observed data
+         
+         xl <- seq(0, 8, 0.1)
+         yl <- 5 + 4 * sqrt(9 * xl) * as.numeric(xl <
+                                                   2) + as.numeric(xl >= 2) * (abs(xl -
+                                                                                     6)^(2))
+         Dl <- data.frame(xl, yl) # for plotting the true data
+         
+         
+         # Specify the number of folds for
+         # V-fold cross-validation
+         folds = 5
+         ## split data into 5 groups for 5-fold
+         ## cross-validation we do this here so
+         ## that the exact same folds will be
+         ## used in both the SL fit with the R
+         ## package, and the hand coded SL
+         index <- split(1:1000, 1:folds)
+         splt <- lapply(1:folds, function(ind) D[index[[ind]], ])
+         
+         # Fit using the SuperLearner package,
+         # specify outcome for prediction
+         # (y), the predictors (x), the loss
+         # function (L2), the library
+         # (sl.lib), and number of folds
+         fitY <- SuperLearner(Y = y, X = data.frame(x),
+                              method = "method.NNLS", SL.library = c("SL.lm", "SL.ranger"),
+                              cvControl = list(V = folds, validRows = index))
+         # View the output: 'Risk' column
+         # returns the CV-MSE estimates
+         # 'Coef' column gives the weights for the final SuperLearner
+         # (meta-learner)
+         fitY
+         
+         # Now predict the outcome for all
+         # possible x
+         yS <- predict(fitY, newdata = data.frame(x = xl),onlySL = T)$pred
+         # Create a dataframe of all x
+         # and predicted SL responses
+         Dl1 <- data.frame(xl, yS)
+         
 #------------------------------------------------------ Estadísticas Descriptívas ---------------------------------------------------------------------------------------------------------------------- 
+
+#------------------------------------------------------ Depurar bases  ---------------------------------------------------------------------------------------------------------------------- 
+         
+         rm(train_cali)
+         rm(administrative)
+         rm(Bogota)
+         rm(bus_bog)
+         rm(bus_cali)
+         rm(bus_med)
+         rm(Cali)
+         rm(Medellin)
+         rm(colegios_bog)
+         rm(colegios_cali)
+         rm(colegios_med)
+         rm(imp)
+         rm(imp2)
+         rm(industrial_bog)
+         rm(industrial_cali)
+         rm(industrial_med)
+         rm(kinder_bog)
+         rm(kinder_cali)
+         rm(kinder_med)
+         rm(metro_med)
+         rm(office_bog)
+         rm(office_cali)
+         rm(office_med)
+         rm(osm)
+         rm(osm_sfp2)
+         rm(osm_p2)
+         rm(osm_sfp3)
+         rm(osm_p3)
+         rm(osm_sfp)
+         rm(osm_p)
+         rm(osm_sf)
+         rm(osm_sf10)
+         rm(osm_sf11)
+         rm(osm_sf12)
+         rm(osm_sf13)
+         rm(osm_sf14)
+         rm(osm_sf15)
+         rm(osm_sf16)
+         rm(osm_sf17)
+         rm(osm_sf18)
+         rm(osm_sf19)
+         rm(osm_sf20)
+         rm(osm_sf2)
+         rm(osm_sf21)
+         rm(osm_sf22)
+         rm(osm_sf23)
+         rm(osm_sf24)
+         rm(osm_sf25)
+         rm(osm_sf26)
+         rm(osm_sf3)
+         rm(osm_sf4)
+         rm(osm_sf5)
+         rm(osm_sf6)
+         rm(osm_sf7)
+         rm(osm_sf8)
+         rm(osm_sf9)
+         rm(osm10)
+         rm(osm11)
+         rm(osm12)
+         rm(osm13)
+         rm(osm14)
+         rm(osm15)
+         rm(osm16)
+         rm(osm17)
+         rm(osm18)
+         rm(osm19)
+         rm(osm2)
+         rm(osm20)
+         rm(osm21)
+         rm(osm22)
+         rm(osm23)
+         rm(osm24)
+         rm(osm25)
+         rm(osm26)
+         rm(osm3)
+         rm(osm4)
+         rm(osm5)
+         rm(osm6)
+         rm(osm7)
+         rm(osm8)
+         rm(osm9)
+         rm(retail_bog)
+         rm(retail_cali)
+         rm(retail_med)
+         rm(test2)
+         rm(train)
+         rm(train2)
+         rm(train3)
+         rm(universidades_bog)
+         rm(universidades_med)
+         rm(universidades_cali)
+         rm(vias_bog)
+         rm(vias_med)
+         rm(vias_cali)
+         rm(noNA)
+         rm(matrix_dist_cai_cali)
+         rm(matrix_dist_cai_bog)
+         rm(matrix_dist_cai_med)
+         rm(matrix_dist_bus_bog)
+         rm(matrix_dist_bus_med)
+         rm(matrix_dist_bus_cali)
+         rm(matrix_dist_col_bog)
+         rm(matrix_dist_col_med)
+         rm(matrix_dist_col_cali)
+         rm(matrix_dist_ind_bog)
+         rm(matrix_dist_ind_med)
+         rm(matrix_dist_ind_cali)
+         rm(matrix_dist_kin_bog)
+         rm(matrix_dist_kin_med)
+         rm(matrix_dist_kin_cali)
+         rm(matrix_dist_off_bog)
+         rm(matrix_dist_off_med)
+         rm(matrix_dist_off_cali)
+         rm(matrix_dist_ret_bog)
+         rm(matrix_dist_ret_med)
+         rm(matrix_dist_ret_cali)
+         rm(matrix_dist_uni_bog)
+         rm(matrix_dist_uni_med)
+         rm(matrix_dist_uni_cali)
+         rm(matrix_dist_vias_bog)
+         rm(matrix_dist_vias_med)
+         rm(matrix_dist_vias_cali)
+         
+         rm(min_dist_cai_cali)
+         rm(min_dist_cai_bog)
+         rm(min_dist_cai_med)
+         rm(min_dist_bus_bog)
+         rm(min_dist_bus_med)
+         rm(min_dist_bus_cali)
+         rm(min_dist_col_bog)
+         rm(min_dist_col_med)
+         rm(min_dist_col_cali)
+         rm(min_dist_ind_bog)
+         rm(min_dist_ind_med)
+         rm(min_dist_ind_cali)
+         rm(min_dist_kin_bog)
+         rm(min_dist_kin_med)
+         rm(min_dist_kin_cali)
+         rm(min_dist_off_bog)
+         rm(min_dist_off_med)
+         rm(min_dist_off_cali)
+         rm(min_dist_ret_bog)
+         rm(min_dist_ret_med)
+         rm(min_dist_ret_cali)
+         rm(min_dist_uni_bog)
+         rm(min_dist_uni_med)
+         rm(min_dist_uni_cali)
+         rm(min_dist_vias_bog)
+         rm(min_dist_vias_med)
+         rm(min_dist_vias_cali)
+         
+         rm(x)
+         
+         
+         
