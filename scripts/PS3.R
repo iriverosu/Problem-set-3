@@ -1046,7 +1046,7 @@ leaflet() %>% addTiles() %>% addPolygons(data=Medellin,col="red") %>% addCircles
          
          x<- select(train_rf,-price,-geometry,-holdout)
          y<-select(train_rf, price)
-         y<- log(y)
+         y<-log(y)
          train_ols<-cbind(x,y)
          train_ols$property_type<-as.factor(train_ols$property_type)
          set.seed(12345)
@@ -1132,10 +1132,9 @@ leaflet() %>% addTiles() %>% addPolygons(data=Medellin,col="red") %>% addCircles
 #----3.R F ------------------------------------------------------------------------------------------------------------------------------------------------------------------------
          install.packages("ranger")
          library(ranger)
-         
+        
          #base para reemplazo del modelo
          x_continuas=(train_ols[c(1,3,6,7,8,4,5,9,10,11,12,13,14)])
-         x_continuas<-scale(x_continuas,center=T,scale=T)
          x_categoricas=(train_ols[c(2)])
         # Ahora procedemos a dummyficar la base
          x_categoricas<- model.matrix(~ ., x_categoricas) %>%
@@ -1159,14 +1158,25 @@ leaflet() %>% addTiles() %>% addPolygons(data=Medellin,col="red") %>% addCircles
                                           data = x, 
                                           method = "ranger", 
                                           trControl = cv3,
-                                          metric = 'Recall', 
+                                          metric = 'RMSE', 
                                           verbose = TRUE,
                                           tuneGrid = tunegrid_rf)
+                        #The final values used for the model were mtry = 3, splitrule = variance
+                        #and min.node.size = 10.
                         
+    test_rf<- select(test_rf, -geometry,-holdout)
                         
+    test_rf$property_type<-ifelse(test_rf$property_type=='Casa',1,0)
+    'property_typeCasa'->names(test_rf)[names(test_rf)=='property_type']
+    test_rf$property_typeCasa<- as.factor(test_rf$property_typeCasa)
+    
+      
                         # El mejor modelo es aquel que tiene mtry = X y min.node.size = X
                         y_hat_outsample2 = predict(modeloRF, newdata = predicciones_general_t)
-                       
+                        y_hat_outsample3 = predict(modeloRF, newdata = test_rf)
+                        y_hat_outsample3<-as.data.frame(y_hat_outsample2)
+                        
+                        rmse2 <- RMSE(y_pred = exp(y_hat_outsample2), y_true = test_rf$price)
 
 #--------------## Visualize variable importance ----------------------------------------------
                         
