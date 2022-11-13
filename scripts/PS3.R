@@ -1119,6 +1119,7 @@ leaflet() %>% addTiles() %>% addPolygons(data=Medellin,col="red") %>% addCircles
          mean(en$resample$RMSE) 0.5141376
          mean(en$results$MAE) 0.4131547
          mean(en$results$Rsquared) 0.4233886
+         
          alpha      lambda    RMSE       Rsquared   MAE      
          0.0000000  0.000100  0.5148004  0.4453253  0.3946089
          Fitting alpha = 1, lambda = 1e-04 on full training set
@@ -1159,7 +1160,7 @@ leaflet() %>% addTiles() %>% addPolygons(data=Medellin,col="red") %>% addCircles
                                           data = x, 
                                           method = "ranger", 
                                           trControl = cv3,
-                                          metric = 'Recall', 
+                                          metric = 'Acurracy', 
                                           verbose = TRUE,
                                           tuneGrid = tunegrid_rf)
                         
@@ -1213,6 +1214,19 @@ leaflet() %>% addTiles() %>% addPolygons(data=Medellin,col="red") %>% addCircles
                           metric = "Sens",
                           tuneGrid = grid_default
                         )
+                        
+                        Tuning parameter 'colsample_bytree' was held constant at a value of 0.7
+                        Tuning parameter 'subsample' was held constant at a value of 0.6
+                        RMSE was used to select the optimal model using the smallest value.
+                        The final values used for the model were nrounds = 500, max_depth = 8, eta = 0.3, gamma = 0, colsample_bytree =
+                          0.7, min_child_weight = 50 and subsample = 0.6.
+                        
+                        eta   max_depth  gamma  min_child_weight  nrounds  RMSE       Rsquared   MAE      
+                        0.01  4          0      10                250      0.6656511  0.5832051  0.5106976
+                        
+                        mean(xgboost$results$RMSE) #0.555
+                        mean(xgboost$results$MAE) #0.409243
+                        mean(xgboost$results$Rsquared) #0.6966885
                         
  #----4. Adaboost ---------------------------------------------
                         
