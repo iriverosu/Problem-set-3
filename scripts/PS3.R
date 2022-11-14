@@ -8,6 +8,12 @@
     install.packages("nngeo")
     install.packages("spdep")
     install.packages("missForest")
+    install.packages("caret", dependencies = c("Depends", "Suggests"))
+    install.packages("Metrics")
+    install.packages("ggplot2")
+    library(ggplot2)
+    library(Metrics)
+    library(caret)
     library(tidyverse)
     library(missForest)
     library(spdep)
@@ -19,6 +25,8 @@
     require(pacman)
     p_load(here,knitr,tidyverse,ggthemes,fontawesome,kableExtra)
     p_load(tidyverse,rio,viridis,sf, leaflet, tmaptools)
+    p_load(tidyverse, fastDummies, caret, glmnet, MLmetrics)
+    
     # option html
     options(htmltools.dir.version = F)
     opts_chunk$set(fig.align="center", fig.height=4 , dpi=300 , cache=F)
@@ -43,7 +51,7 @@
   ##Variables
     #1.Área total o cubierta
     #2.bedrooms
-    #3.bathrooms (k-vecinos)
+    #3.bathrooms (k-vecinos)  
     #4.property type
     #5.Office
     #6.Industrial
@@ -1024,6 +1032,8 @@ leaflet() %>% addTiles() %>% addPolygons(data=Medellin,col="red") %>% addCircles
          
          train_final$bathrooms_final <- as.integer(train_final$bathrooms_final)
          test$bathrooms_final <- as.integer(test$bathrooms_final)
+         test$surface_final <- as.integer(test$surface_final)
+         train_rf$surface_final <- as.integer(train_rf$surface_final)
          
 #-------División de muestra train y test (de Bog y Med)
          
@@ -1038,24 +1048,31 @@ leaflet() %>% addTiles() %>% addPolygons(data=Medellin,col="red") %>% addCircles
          
 #-------------------------------------------------------------- Modelo ---------------------------------------------------------------------------------------------------------------------- 
 #----1.O L S ----------------------------------------------------------------------------------------------------------------
+         
+         x<- select(train_rf,-price,-geometry,-holdout)
+         y<-select(train_rf, price)
+         y<- log(y)
+         train_ols<-cbind(x,y)
+         train_ols$property_type<-as.factor(train_ols$property_type)
          set.seed(12345)
-         ols <- train(log_ing_per~ Tipo_vivienda+ rs_jefe_hogar+edu_jefe_hogar+ Ncuartos + Ncuartos_dormir+ 
-                        Nper+Npersug+ hacinamiento+edad_jefe_hogar+Horas_trabajo1+Horas_trabajo2+
-                        arriendo_estimado+ocupacion_jefe_hogar+Dominio+subsidio+sexo_jefe_hogar, # model to fit
-                      data = train,
+         ols <- train(price~ property_type+ bedrooms+surface_final+ bathrooms_final+ dist_cai+dist_bus+ dist_ret+dist_ind+
+                      dist_off + dist_vias+ dist_kin+dist_col+ dist_uni,# model to fit
+                      data = train_ols,
                       trControl = trainControl(method = "cv", number = 10),
                       method = "lm")
-         
-         ols$results
-         #intercept      RMSE  Rsquared      MAE    RMSESD  RsquaredSD       MAESD
-         #1      TRUE 1.036285 0.3469095 0.538377 0.0333237 0.008536496 0.007743297
 
-#-----2.Gráfico de coeficientes OLS 
+         ols$finalModel$coefficients
+         #intercept      RMSE  Rsquared      MAE    RMSESD    RsquaredSD    MAESD
+         #    TRUE   0.514107 0.4458714 0.3935926 0.005537195 0.01589225 0.004633498
+         RMSE      Rsquared   MAE      
+         0.514107  0.4458714  0.3935926
          
-         df_coeficientes_reg2 <- ols$finalModel$coefficients %>%
+#-----1.1 .Gráfico de coeficientes OLS 
+         
+         df_coeficientes_reg<- ols$finalModel$coefficients %>%
            enframe(name = "predictor", value = "coeficiente")
          
-         df_coeficientes_reg2[-1,] %>%
+         df_coeficientes_reg[-1,] %>%
            filter(predictor != "`(Intercept)`") %>%
            ggplot(aes(x = reorder(predictor, abs(coeficiente)), 
                       y = coeficiente)) +
@@ -1065,234 +1082,305 @@ leaflet() %>% addTiles() %>% addPolygons(data=Medellin,col="red") %>% addCircles
                 x = "Variables",
                 y = "Coeficientes") +
            theme_bw()
-        
-#----2.E L A S T I C   N E T --------------------------------------------------            
+         
+#-----1.2 Resultados test 
+         y_ols_test<-predict(ols,newdata=test_rf)
+         RMSE1<-rmse(log(test_rf$price), y_ols_test)#0.5190467
+         MAE1<-mae(log(test_rf$price), y_ols_test)#0.3972433
+         RSQUARE = function(y_actual,y_predict){
+             cor(y_actual,y_predict)^2
+         }
+         RSQUARE(log(test_rf$price), y_ols_test) #0.4492948
+         
+#-----2. Forwad selection         
+         forward <- train(price ~ ., data = train_ols,
+                          method = "leapForward",
+                          trControl = trainControl(method = "cv", number = 10))
+         forward
+         
+         nvmax  RMSE       Rsquared   MAE      
+         2      0.5329273  0.4043518  0.4070229
+         3      0.5280398  0.4151745  0.4024380
+         4      0.5227795  0.4267756  0.3994420
+         
+#------2.1 Resultados en test 
+         
+         y_forward_test<-predict(forward,newdata=test_rf)
+         RMSE1<-rmse(log(test_rf$price), y_forward_test)#0.526729
+         MAE1<-mae(log(test_rf$price), y_forward_test)#0.4025454
+         RSQUARE(log(test_rf$price), y_forward_test) #0.4327536
+         
+#-----3. Backward selection
+         backwards <- train(price ~ ., data = train_ols,
+                            method = "leapBackward",
+                            trControl = trainControl(method = "cv", number = 10))
+         backwards
+         
+         
+         nvmax  RMSE       Rsquared   MAE      
+         2      0.5329517  0.4044860  0.4070588
+         3      0.5280726  0.4153445  0.4024745
+         4      0.5228242  0.4269313  0.3994806
+         
+#--------3.1 Resultados en test 
+         y_backwards_test<-predict(backwards,newdata=test_rf)
+         RMSE1<-rmse(log(test_rf$price), y_backwards_test)#0.526729
+         MAE1<-mae(log(test_rf$price), y_backwards_test)#0.4025454
+         RSQUARE(log(test_rf$price), y_backwards_test) #0.4327536
+         
+         
+#----4.E L A S T I C   N E T --------------------------------------------------            
          # Model Building : Elastic Net Regression
          custom <- trainControl(method = "repeatedcv",
                                 number = 10,
                                 repeats = 5,
                                 verboseIter = TRUE)
          set.seed(12345)
-         en <- train(y_train~.,
-                     data=cbind(x_train,y_train),
+         en <- train(price~.,
+                     data=train_ols,
                      method='glmnet',
                      tuneGrid =expand.grid(alpha=seq(0,1,length=10),
                                            lambda = seq(0.0001,0.2,length=5)),
-                     trControl=custom)
-         #Resultados 
-         "mean(en$resample$RMSE) 1.036258
-             MSE was used to select the optimal model using the smallest value.
-             The final values used for the model were alpha = 0.6666667 and lambda = 1e-04      "        
-         r22 <- R2_Score(y_pred = predicciones_test, y_true = test$log_ing_per)
-         rmse2 <- RMSE(y_pred = predicciones_test, y_true = test$log_ing_per)
-         mae(test$log_ing_per, predicciones_test)   
-         
-         #Ploting EN
+                     trControl=custom,
+                     preProcess = c("center", "scale")
+                     )
+#-------4.1 Resultados 
+         en
+         mean(en$resample$RMSE) 0.5141376
+         mean(en$results$MAE) 0.4131547
+         mean(en$results$Rsquared) 0.4233886
+        
+         alpha      lambda    RMSE       Rsquared   MAE      
+         0.0000000  0.000100  0.5148004  0.4453253  0.3946089
+         Fitting alpha = 1, lambda = 1e-04 on full training set
+
+#--------4.2 Ploting EN
          plot(en, main = "Elastic Net Regression")
          #plotting important variables
          plot(varImp(en,scale=TRUE))
-         
-         
-         #----------Problema de clasificaciòn
-         modelo<- glmnet(
-           x           = x_train,
-           y           = y_train,
-           alpha       = 0.6666667,
-           lambda      = 0.0001,
-           standardize = TRUE
-         )
-         
-         predicciones_train <- predict(modelo, newx = predicciones_general)
-         predicciones_test <- predict(modelo, newx = predicciones_general_t)
-         
-         y_hat_en_insample<-predicciones_train
-         y_hat_en_outsample<-predicciones_test
-         
-         y_hat_en_insample1 <- as.numeric(ifelse(exp(y_hat_en_insample)<train$Lp,1,0))
-         y_hat_en_outsample1 <- as.numeric(ifelse(exp(y_hat_en_outsample)<test$Lp,1,0))
-         
-         #-----------Métricas para matriz 
-         acc_insample1122 <- Accuracy(y_pred = y_hat_en_insample1, y_true = train$Pobre)
-         acc_outsample1122 <- Accuracy(y_pred = y_hat_en_outsample1, y_true = test$Pobre)
-         
-         pre_insample1122 <- Precision(y_pred = y_hat_en_insample1, y_true = train$Pobre, positive = 1)
-         pre_outsample1122 <- Precision(y_pred = y_hat_en_outsample1, y_true = test$Pobre, positive = 1)
-         
-         rec_insample1122<- Recall(y_pred = y_hat_en_insample1, y_true = train$Pobre, positive = 1)
-         rec_outsample1122 <- Recall(y_pred = y_hat_en_outsample1, y_true = test$Pobre, positive = 1)
-         
-         f1_insample1122 <- F1_Score(y_pred = y_hat_en_insample1, y_true = train$Pobre, positive = 1)
-         f1_outsample1122 <- F1_Score(y_pred = y_hat_en_outsample1, y_true = test$Pobre, positive = 1)
-         
-         metricas_insample1122 <- data.frame(Modelo = "Regresión lineal", 
-                                             "Muestreo" = NA, 
-                                             "Evaluación" = "Dentro de muestra",
-                                             "Accuracy" = acc_insample1122,
-                                             "Precision" = pre_insample1122,
-                                             "Recall" = rec_insample1122,
-                                             "F1" = f1_insample1122)
-         
-         metricas_outsample1122 <- data.frame(Modelo = "Regresión lineal", 
-                                              "Muestreo" = NA, 
-                                              "Evaluación" = "Fuera de muestra",
-                                              "Accuracy" = acc_outsample1122,
-                                              "Precision" = pre_outsample1122,
-                                              "Recall" = rec_outsample1122,
-                                              "F1" = f1_outsample1122)
-         
-         metricas1122 <- bind_rows(metricas_insample112, metricas_outsample112)
-         metricas1122
-         
-         Modelo Muestreo        Evaluación  Accuracy Precision    Recall        F1
-         1 Regresión lineal       NA Dentro de muestra 0.8421208 0.6706259 0.4130781 0.5112482
-         2 Regresión lineal       NA  Fuera de muestra 0.8414464 0.6704463 0.4182721 0.5151543
-         
-         ## En
-         en_prob = confusionMatrix(data=factor(y_hat_outsample1) , 
-                                   reference=factor(test$Pobre) , 
-                                   mode="sens_spec" , positive="1")
-         en_prob
-         onfusion Matrix and Statistics
-         
-         Reference
-         Prediction     0     1
-         0 24915  5995
-         1  1433   649
-         
-         Accuracy : 0.7749          
-         95% CI : (0.7703, 0.7794)
-         No Information Rate : 0.7986          
-         P-Value [Acc > NIR] : 1               
-         
-         Kappa : 0.0583          
-         
-         Mcnemars Test P-Value : <2e-16          
-         
-         Sensitivity : 0.09768         
-         Specificity : 0.94561         
-         Pos Pred Value : 0.31172         
-         Neg Pred Value : 0.80605         
-         Prevalence : 0.20138         
-         Detection Rate : 0.01967         
-         Detection Prevalence : 0.06311         
-         Balanced Accuracy : 0.52165         
-         
-         'Positive' Class : 1 
-         
-         
+
+#--------4.3 Resultados en test 
+         y_en_test<-predict(en,newdata=test_rf)
+         RMSE1<-rmse(log(test_rf$price), y_en_test)#0.5190552
+         MAE1<-mae(log(test_rf$price), y_en_test)#0.3972199
+         RSQUARE(log(test_rf$price), y_en_test) #0.4493329
           
 #----3.R F ------------------------------------------------------------------------------------------------------------------------------------------------------------------------
          install.packages("ranger")
          library(ranger)
          
-         y_train2<-upSampledTrain$Pobre
-         x_train2<-upSampledTrain
-         x_train2<-x_train2[,-62]
-         x_train2<-x_train2[,-61]
-         x_train2<-x_train2[,-60]
-         x_continuas=(upSampledTrain[,c(3,4,6,7,14,18,22,24,26)])
-         x_categoricas=(upSampledTrain[,c(2,5,17,19,20,21,25)])
-         # Ahora procedemos a dummyficar la base
-         x_categoricas<- model.matrix(~ ., x_categoricas) %>%
-           as.data.frame 
-         predicciones_general<- cbind(x_categoricas,x_continuas)
-         
          #base para reemplazo del modelo
-         x_continuas_t=(test_hogares[c(3,4,6,7,8,9,13,14,15)]
-                        x_continuas_t<-scale(x_continuas_t,center=T,scale=T)
-                        x_categoricas_t=(test_hogares[,c(2,5,10,11,12,16,17)])
-                        
-                        
-                        # Ahora procedemos a dummyficar la base
-                        x_categoricas_t<- model.matrix(~ ., x_categoricas_t) %>%
+         x_continuas=(train_ols[c(1,3,6,7,8,4,5,9,10,11,12,13,14)])
+         x_categoricas=(train_ols[c(2)])
+        # Ahora procedemos a dummyficar la base
+         x_categoricas<- model.matrix(~ ., x_categoricas) %>%
                           as.data.frame 
-                        
-                        x_categoricas_t<-x_categoricas_t[,-1]
-                        x_categoricas_t<-cbind(DominioBOGOTA,x_categoricas_t)
-                        predicciones_general_t<- cbind(x_categoricas_t,x_continuas_t)
-                        
-                        
-                        
-                        # Creamos una grilla para tunear el random forest
+         x<- cbind(x_categoricas,x_continuas)
+         x=(x[c(-1)])
+         x$property_typeCasa<-as.factor(x$property_typeCasa)
+         
+#------ Creamos una grilla para tunear el random forest
                         set.seed(12345)
                         cv3 <- trainControl(number = 3, method = "cv")
                         tunegrid_rf <- expand.grid(mtry = c(3, 5, 10), 
                                                    min.node.size = c(10, 30, 50,
                                                                      70, 100),
-                                                   splitrule="gini"
+                                                   splitrule="variance"
                         )
                         
-                        modeloRF <- train(y_train2 ~ .,
-                                          data = cbind(y_train2, x_train2), 
+#------ Modelo Random forest
+                        
+                        modeloRF <- train( price~ .,
+                                          data = x, 
                                           method = "ranger", 
                                           trControl = cv3,
-                                          metric = 'Recall', 
+                                          metric = 'Acurracy', 
                                           verbose = TRUE,
+                                          preProcess= c("center", "scale"),
                                           tuneGrid = tunegrid_rf)
-                        
+#-------Resultados
+                        modeloRF
+                        mean(modeloRF$results$RMSE) 0.363424
+                        mean(modeloRF$results$MAE) 0.2631535
+                        mean(modeloRF$results$Rsquared) 0.728282
+                        RMSE was used to select the optimal model using the smallest value.
+                        The final values used for the model were mtry = 3, splitrule = variance and min.node.size = 10.
                         
                         # El mejor modelo es aquel que tiene mtry = X y min.node.size = X
-                        y_hat_outsample2 = predict(modeloRF, newdata = predicciones_general_t)
-                        
-         
-#----4.SP L ---------------------------------------------
-         
-#Pruebas 
-         
-         superlearner
-         
-         require("tidyverse")
-         require("ranger")
-         require("SuperLearner")
-         # set the seed for reproducibility
-         set.seed(123)
-         # generate the observed data
-         n = 1000
-         x = runif(n, 0, 8)
-         y = 5 + 4 * sqrt(9 * x) * as.numeric(x <2) + as.numeric(x >= 2) * (abs(x - 6)^(2)) +rlaplace(n)
-         D <- data.frame(x, y) # observed data
-         
-         xl <- seq(0, 8, 0.1)
-         yl <- 5 + 4 * sqrt(9 * xl) * as.numeric(xl <
-                                                   2) + as.numeric(xl >= 2) * (abs(xl -
-                                                                                     6)^(2))
-         Dl <- data.frame(xl, yl) # for plotting the true data
-         
-         
-         # Specify the number of folds for
-         # V-fold cross-validation
-         folds = 5
-         ## split data into 5 groups for 5-fold
-         ## cross-validation we do this here so
-         ## that the exact same folds will be
-         ## used in both the SL fit with the R
-         ## package, and the hand coded SL
-         index <- split(1:1000, 1:folds)
-         splt <- lapply(1:folds, function(ind) D[index[[ind]], ])
-         
-         # Fit using the SuperLearner package,
-         # specify outcome for prediction
-         # (y), the predictors (x), the loss
-         # function (L2), the library
-         # (sl.lib), and number of folds
-         fitY <- SuperLearner(Y = y, X = data.frame(x),
-                              method = "method.NNLS", SL.library = c("SL.lm", "SL.ranger"),
-                              cvControl = list(V = folds, validRows = index))
-         # View the output: 'Risk' column
-         # returns the CV-MSE estimates
-         # 'Coef' column gives the weights for the final SuperLearner
-         # (meta-learner)
-         fitY
-         
-         # Now predict the outcome for all
-         # possible x
-         yS <- predict(fitY, newdata = data.frame(x = xl),onlySL = T)$pred
-         # Create a dataframe of all x
-         # and predicted SL responses
-         Dl1 <- data.frame(xl, yS)
-         
-#------------------------------------------------------ Estadísticas Descriptívas ---------------------------------------------------------------------------------------------------------------------- 
+                        y_hat_outsample2 = predict(modeloRF, newdata = test_rf)
+                       
 
+#--------------## Visualize variable importance 
+                        
+                        plot(modeloRF)
+                        varImp(modeloRF)
+                        
+                        install.packages("ranger")
+                        library(ranger)
+                        modelo  <- ranger(
+                          formula   = price~ .,
+                          data      = x,
+                          num.trees = 10,
+                          seed      = 12345,
+                          importance= "impurity"
+                        )
+                        predicciones <- predict(
+                          modelo,
+                          data = test_rf
+                        )
+                        
+                        test_rmse    <- sqrt(mean((predicciones - log(test_rf$price))^2))
+                        paste("Error de test (rmse) del modelo:", round(test_rmse,2)) #0.35
+        
+                        # Get variable importance from the model fi
+                        importancia_pred <- modelo$variable.importance %>%
+                          enframe(name = "predictor", value = "importancia")
+                        
+                        # Gráfico
+                        grafico1<- ggplot(
+                          data = importancia_pred,
+                          aes(x    = reorder(predictor, importancia),
+                              y    = importancia,
+                              fill = importancia)
+                        ) +
+                          labs(x = "predictor", title = "Importancia predictores (permutación)") +
+                          geom_col() +
+                          coord_flip() +
+                          theme_bw() +
+                          theme(legend.position = "none")
+                        
+                        grafico2<-ggplot(
+                          data = importancia_pred,
+                          aes(x    = reorder(predictor, importancia),
+                              y    = importancia,
+                              fill = importancia)
+                        ) +
+                          labs(x = "predictor", title = "Importancia predictores (pureza de nodos)") +
+                          geom_col() +
+                          coord_flip() +
+                          theme_bw() +
+                          theme(legend.position = "none")
+                        
+                        plot_grid(grafico1, grafico2, nrow  = 1, ncol=2, labels="AUTO")
+                        
+                        
+#--------3.3 Resultados en test 
+                        'property_typeCasa'->names(test_rf)[names(test_rf)=='property_type']
+                        test_rf$property_typeCasa<-ifelse(test_rf$property_typeCasa=="Casa",1,0)
+                        test_rf$property_typeCasa<-as.factor(test_rf$property_typeCasa)
+                        y_rf_test<-predict(modeloRF,newdata=test_rf)
+                        RMSE1<-rmse(log(test_rf$price), y_rf_test)#0.327371
+                        MAE1<-mae(log(test_rf$price), y_rf_test)#0.224281
+                        RSQUARE(log(test_rf$price), y_rf_test) #0.7848002
+                        
+   #--------3.4 Predicciones gráfico
+                        test_rf$y_rf_test <- y_rf_test
+                        pl1 <-test_rf %>% 
+                          ggplot(aes(log(price),y_xg_test)) +
+                          geom_point(alpha=0.5) + 
+                          stat_smooth(aes(Precio='predicho')) +
+                          xlab('Precio real') +
+                          ylab('Precio predicho')+
+                          theme_bw()
+                        
+                        ggplotly(pl1)
+                        
+          
+#------ 4. XGBOOTS ---------------------------------------------------------------------------------------------------------------
+                        
+                       install.packages("xgboost")
+                       library(xgboost)
+                        grid_default <- expand.grid(nrounds = c(250,500),
+                                                    max_depth = c(4,6,8),
+                                                    eta = c(0.01,0.3,0.5),
+                                                    gamma = c(0,1),
+                                                    min_child_weight = c(10, 25,50),
+                                                    colsample_bytree = c(0.7),
+                                                    subsample = c(0.6))
+                        
+                        ctrl<- trainControl(method = "cv",
+                                                 number = 5,
+                                                 summaryFunction = defaultSummary,
+                                                 classProbs = TRUE,
+                                                 verbose=FALSE,
+                                                 savePredictions = T)
+                        set.seed(1410)
+                        xgboost <- train(
+                          price ~.,
+                          data=x,
+                          method = "xgbTree",
+                          trControl = ctrl,
+                          metric = "RMSE",
+                          tuneGrid = grid_default,
+                          preProcess = c("center", "scale")
+                        )
+                        
+                        Tuning parameter 'colsample_bytree' was held constant at a value of 0.7
+                        Tuning parameter 'subsample' was held constant at a value of 0.6
+                        RMSE was used to select the optimal model using the smallest value.
+                        The final values used for the model were nrounds = 500, max_depth = 8, eta = 0.3, gamma = 0, colsample_bytree =
+                          0.7, min_child_weight = 50 and subsample = 0.6.
+                        xgboost$
+                          
+                        
+                        min(xgboost$results$RMSE) #0.347947
+                        min(xgboost$results$MAE) #0.2450082
+                        max(xgboost$results$Rsquared) #0.7478363
+                        
+#--------3.3 Resultados en test 
+                        y_xg_test<-predict(xgboost,newdata=test_rf)
+                        RMSE1<-rmse(log(test_rf$price), y_xg_test)#0.3398501
+                        MAE1<-mae(log(test_rf$price), y_xg_test)#0.2392797
+                        RSQUARE(log(test_rf$price), y_xg_test) #0.7647703
+                        
+#--------3.3 Gráfico de resultados  
+                      resultados %>% mutate(modelo = fct_relevel(modelo, 
+                                                               "RANDOM FOREST","XG-BOOST","OLS", "ELASTIC NET", "FORWARD", "BACWARD")) %>%
+                      install.packages("cowplot")
+                        library(cowplot)  
+                         Barra1<- ggplot(resultados,aes(modelo,RMSE))+ geom_bar(width = 0.9, stat="identity",             
+                                                                        position = position_dodge())+ ylim(c(0,0.75))+
+                            labs(x="Modelo de regresión", y= "RMSE \n (Fuera de muestra)") +
+                            labs(fill = "")+ theme_linedraw()+facet_grid(~"Diagrama de barras para el RMSE")+
+                            geom_text(aes(label=RMSE), vjust=0.9, hjust=1.2, color="white",position = position_dodge(0.9),size=4.0) + 
+                            theme_bw(base_size=15)        + theme_light() +coord_flip()   +scale_fill_manual(values=brewer.pal(n = 3, name = "Accent"))    
+                          
+                         Barra2<- ggplot(resultados,aes(modelo,Rsquared))+ geom_bar(width = 0.9, stat="identity",              
+                                                                                position = position_dodge())+ ylim(c(0,1))+
+                           labs(x="Modelo de regresión", y= "Rcuadrado \n (Fuera de muestra)") +
+                           labs(fill = "darkblue")+ theme_linedraw()+facet_grid(~"Diagrama de barras para el Rcuadrado")+
+                           geom_text(aes(label=Rsquared), vjust=0.9, hjust=1.2, color="white",position = position_dodge(0.9),size=4.0) + 
+                           theme_bw(base_size=15)        + theme_light() +coord_flip()  +scale_fill_manual(values=brewer.pal(n = 3, name = "Accent"))  
+                         
+                    
+                      plot_grid(Barra1, Barra2, nrow  = 1, ncol=2, labels="AUTO")
+                         
+#------------------------------------------------------ Estadísticas Descriptívas ---------------------------------------------------------------------------------------------------------------------- 
+               
+                      library(ggplot2)
+                      install.packages("corrplot")
+                      library(corrplot)
+                      library(mlbench)
+                      install.packages("Amelia")
+                      library(Amelia)
+                      install.packages("plotly")
+                      library(plotly)
+                      library(reshape2)
+                      library(caret)
+                      library(caTools)
+                      library(dplyr) 
+#Correlación entre variables
+                      corrplot(cor(select(x,-property_typeCasa)))
+#Effect of the variables in the dataframe on price.
+                        x %>%
+                        select(c(-property_typeCasa)) %>%
+                        melt(id.vars = "price") %>%
+                        ggplot(aes(x = value, y = price, colour = variable)) +
+                        geom_point(alpha = 0.7) +
+                        stat_smooth(aes(colour = "black")) +
+                        facet_wrap(~variable, scales = "free", ncol = 2) +
+                        labs(x = "Variable Value", y = "Median House Price ($1000s)") +
+                        theme_minimal()
 #------------------------------------------------------ Depurar bases  ---------------------------------------------------------------------------------------------------------------------- 
          
          rm(train_cali)
