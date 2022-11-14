@@ -11,6 +11,10 @@
     install.packages("caret", dependencies = c("Depends", "Suggests"))
     install.packages("Metrics")
     install.packages("ggplot2")
+    install.packages("dplyr")
+    install.packages("cowplot")
+    library(cowplot)
+    library(dplyr)
     library(ggplot2)
     library(Metrics)
     library(caret)
@@ -90,7 +94,6 @@
               sum(is.na(train2$new_surface))#37060
               train2$new_surface<-(ifelse((is.na(train2$new_surface)),train2$surface_covered,train2$new_surface))
               sum(is.na(train2$new_surface))#32704
-    
 ----------#1.2 imputacion missings con arboles
               train2$city<-as.factor(train2$city)
               train2$property_type<-as.factor(train2$property_type)
@@ -169,17 +172,15 @@
     test<-cbind(test,noNA$bathrooms)
     names(test)
     'bathrooms_final'->names(test)[names(test)=='noNA.bathrooms']
-    
     #Valores como enteros
     
 #3  Modificar la base test ----------------------------------------------------------------------------------------------------------------
     test<-test %>% select(-surface_total,-surface_covered,-rooms, -bathrooms, -title, -description, -operation_type, -new_surface)
-
 #-------------------------------------------------- Delimitar las ciudades ----------------------------------------------------------------------------------------------------------------------- 
 #----1. Bogotá  -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------  
       ####################### Delimitar Bogotá 
       Bogota <- getbb(place_name = "Bogota", 
-                      featuretype = "boundary:administrative", 
+                      featuretype = "boundary:administrative + admin_level= 8" ,
                       format_out = "sf_polygon") %>% .$multipolygon
       Bogota<-Bogota[1,]
       leaflet() %>% addTiles() %>% addPolygons(data=Bogota)
@@ -1033,7 +1034,6 @@ leaflet() %>% addTiles() %>% addPolygons(data=Medellin,col="red") %>% addCircles
          train_final$bathrooms_final <- as.integer(train_final$bathrooms_final)
          test$bathrooms_final <- as.integer(test$bathrooms_final)
          test$surface_final <- as.integer(test$surface_final)
-         train_rf$surface_final <- as.integer(train_rf$surface_final)
          
 #-------División de muestra train y test (de Bog y Med)
          
@@ -1043,6 +1043,7 @@ leaflet() %>% addTiles() %>% addPolygons(data=Medellin,col="red") %>% addCircles
                                         sample(nrow(train_final), nrow(train_final)*.2)))
          test_rf<-train_final[train_final$holdout==T,] #10.287
          train_rf<-train_final[train_final$holdout==F,] #41.150
+         train_rf$surface_final <- as.integer(train_rf$surface_final)
          
 
          
@@ -1188,6 +1189,12 @@ leaflet() %>% addTiles() %>% addPolygons(data=Medellin,col="red") %>% addCircles
                                                    splitrule="variance"
                         )
                         
+                        cv3 <- trainControl(number = 3, method = "cv")
+                        tunegrid_rf <- expand.grid(mtry = c(3), 
+                                                   min.node.size = c(10),
+                                                   splitrule="variance"
+                        )
+                        
 #------ Modelo Random forest
                         
                         modeloRF <- train( price~ .,
@@ -1200,16 +1207,12 @@ leaflet() %>% addTiles() %>% addPolygons(data=Medellin,col="red") %>% addCircles
                                           tuneGrid = tunegrid_rf)
 #-------Resultados
                         modeloRF
-                        mean(modeloRF$results$RMSE) 0.363424
-                        mean(modeloRF$results$MAE) 0.2631535
-                        mean(modeloRF$results$Rsquared) 0.728282
+                        mean(modeloRF$results$RMSE) 0.363424 0.3405719 
+                        mean(modeloRF$results$MAE) 0.2631535 0.2400904
+                        mean(modeloRF$results$Rsquared) 0.728282  0.7618303
                         RMSE was used to select the optimal model using the smallest value.
                         The final values used for the model were mtry = 3, splitrule = variance and min.node.size = 10.
                         
-                        # El mejor modelo es aquel que tiene mtry = X y min.node.size = X
-                        y_hat_outsample2 = predict(modeloRF, newdata = test_rf)
-                       
-
 #--------------## Visualize variable importance 
                         
                         plot(modeloRF)
@@ -1381,6 +1384,9 @@ leaflet() %>% addTiles() %>% addPolygons(data=Medellin,col="red") %>% addCircles
                         facet_wrap(~variable, scales = "free", ncol = 2) +
                         labs(x = "Variable Value", y = "Median House Price ($1000s)") +
                         theme_minimal()
+                        
+                        
+                        
 #------------------------------------------------------ Depurar bases  ---------------------------------------------------------------------------------------------------------------------- 
          
          rm(train_cali)
@@ -1538,3 +1544,170 @@ leaflet() %>% addTiles() %>% addPolygons(data=Medellin,col="red") %>% addCircles
          
          
          
+#------------------------------------------------------ Predicción final ---------------------------------------------------------------------------------------------------------------------- 
+         'property_typeCasa'->names(test)[names(test)=='property_type']
+         test$property_typeCasa<-ifelse(test$property_typeCasa=="Casa",1,0)
+         test$property_typeCasa<-as.factor(test$property_typeCasa)
+         y_rf_test_final<-predict(modeloRF,newdata=test)
+         test$y_rf_test_final<-y_rf_test_final
+         
+         pl <- ggplot(test, aes(x=exp(y_rf_test_final)))
+         p3<-pl + geom_histogram( aes(fill=..count..), col='black')+ labs(title = 'Precio total vivienda en Cali',
+                                                                                   
+                                                                                   x = 'Precio total casas',
+                                                                                   y = 'conteos',
+                                                                                   subtitle = 'Distrinución',
+                                                                                   caption = 'Resultados Modelo Random Forest')
+         
+         p2 <- ggplot(x2, aes(x=pricem2))
+         p8<-p2 + geom_histogram( aes(fill=..count..), col='black')+ labs(title = 'Precios m2 Cali',
+                                                                                   
+                                                                                   x = 'Precio por m2 en Cali',
+                                                                                   y = 'conteos',
+                                                                                   subtitle = 'Distrinución',
+                                                                                   caption = 'Resultados Modelo Random Forest')+
+           scale_x_continuous(limits = c(0,9000000))
+           
+         p1<-plot_grid(p3,p8, nrow  = 1, ncol=2, labels="AUTO")
+         
+         
+         x2<-test
+         x2<- x2[,-1]
+         x2<-as.data.frame(x2)
+         x2<- select(x2,-geometry,-property_typeCasa)
+         x2$price<- exp(y_rf_test_final)
+         x2$bathrooms_final <- as.integer(x2$bathrooms_final)
+         x2$surface_final <- as.integer(x2$surface_final)
+         
+         
+        
+         corrplot(cor(x2))
+                  #Effect of the variables in the dataframe on price.
+         
+                    x2 %>%
+                    select(c(-property_typeCasa)) %>%
+                    melt(id.vars = "x2") %>%
+                    ggplot(aes(x = value, y = pricem2, colour = variable)) +
+                    geom_point(alpha = 0.7) +
+                    stat_smooth(aes(colour = "black")) +
+                    facet_wrap(~variable, scales = "free", ncol = 2) +
+                    labs(x = "Variable Value", y = "Precio m2") +
+                    theme_minimal()
+                  
+                  
+                  test$price<-exp(y_rf_test_final)
+                  x2$pricem2<-x2$price/x2$surface_final
+                  x2$pricem2<-as.integer(x2$pricem2)
+                  
+                  
+                    cero<- ggplot()+
+                    geom_sf(data=Cali) +
+                    geom_sf(data=x2$geometry,aes(alpha=x2$pricem2))+
+                    scale_x_continuous(limits = c(-76.56,-76.45,0.01))+
+                    theme_minimal()+
+                    labs(x = "Latitud", y = "Longitud") +labs(title = 'Distribución geográfica precios m2- Cali',
+                      subtitle = 'Zona urbana',
+                      caption = 'Precios predichos por modelo RF')+labs(alpha = "Precio m2")
+                      
+                    cero1<- ggplot()+
+                      geom_sf(data=Cali) +
+                      geom_sf(data=x2$geometry,aes(alpha=x2$surface_final), color="cadetblue")+
+                      scale_x_continuous(limits = c(-76.56,-76.45,0.01))+
+                      theme_minimal()+labs(alpha = "Área total")
+                      labs(x = "Latitud", y = "Longitud")
+                    
+                    cero2<- ggplot()+
+                      geom_sf(data=Cali) +
+                      geom_sf(data=x2$geometry,aes(alpha=x2$bathrooms_final), color="darkslategray")+
+                      scale_x_continuous(limits = c(-76.56,-76.45,0.01))+labs(alpha = "total baños")
+                      theme_minimal()+
+                      labs(x = "Latitud", y = "Longitud") 
+                    
+                    cero3<- ggplot()+
+                      geom_sf(data=Cali) +
+                      geom_sf(data=x2$geometry,aes(alpha=x2$bedrooms, color="deepskyblue3")+
+                      scale_x_continuous(limits = c(-76.56,-76.45,0.01))+labs(alpha = "Total cuartos")
+                      theme_minimal()+
+                      labs(x = "Latitud", y = "Longitud")
+                    
+                    p4<-plot_grid(cero,cero1, cero2, cero3, nrow  = 1, ncol=4, labels="AUTO")
+                    
+                    
+                  uno<-ggplot()+
+                    geom_sf(data=Cali) +
+                    geom_sf(data=colegios_cali, color= "red") +
+                    labs(title = 'Colegios')+ scale_x_continuous(limits = c(-76.56,-76.45))+
+                  theme(plot.margin = margin(t = 0.1, r = 0.1,  b = 0.1,   l = 0.1, unit="cm"), axis.text = element_text(size = 6),
+                        plot.title = element_text(size=10))
+                  
+                  dos<-ggplot()+
+                    geom_sf(data=Cali) +
+                    labs(title = 'Oficinas (CBD)')+ scale_x_continuous(limits = c(-76.56,-76.45))+
+                    geom_sf(data=office_cali, color= "pink") + #theme_bw()+
+                   theme(plot.margin = margin(t = 0.1, r = 0.1,  b = 0.1,   l = 0.1, unit="cm"), axis.text = element_text(size = 6),
+                         plot.title = element_text(size=10))
+                  
+                  
+                  tres<-ggplot()+
+                    geom_sf(data=Cali) +
+                    geom_sf(data=industrial_cali, color= "white") +
+                    labs(title = 'Industrias')+ scale_x_continuous(limits = c(-76.56,-76.45))+
+                    theme(plot.margin = margin(t = 0.1, r = 0.1,  b = 0.1,   l = 0.1, unit="cm"), axis.text = element_text(size = 6),
+                          plot.title = element_text(size=10))
+                  #+theme_bw() 
+                  
+                  cuatro<-ggplot()+
+                    geom_sf(data=Cali) +
+                    geom_sf(data=universidades_cali, color= "blue") +
+                    labs(title = 'Universidades')+ scale_x_continuous(limits = c(-76.56,-76.45))+
+                    theme(plot.margin = margin(t = 0.1, r = 0.1,  b = 0.1,   l = 0.1, unit="cm"), axis.text = element_text(size = 6),
+                          plot.title = element_text(size=10))
+                  #+theme_bw() 
+                  
+                  cinco<-ggplot()+
+                    geom_sf(data=Cali) +
+                    geom_sf(data=police_cali, color= "black") +
+                    labs(title = 'CAI')+ scale_x_continuous(limits = c(-76.56,-76.45))+
+                    theme(plot.margin = margin(t = 0.1, r = 0.1,  b = 0.1,   l = 0.1, unit="cm"), axis.text = element_text(size = 6),
+                          plot.title = element_text(size=10))
+                  #+                  theme_bw() 
+                  
+                  seis<-ggplot()+
+                    geom_sf(data=Cali) +
+                    geom_sf(data=bus_cali, color= "brown") +
+                    labs(title = 'Estaciones de buses')+scale_x_continuous(limits = c(-76.56,-76.45))+
+                    theme(plot.margin = margin(t = 0.1, r = 0.1,  b = 0.1,   l = 0.1, unit="cm"), axis.text = element_text(size = 6),
+                          plot.title = element_text(size=10))
+                  #+                  theme_bw() 
+                  
+                  siete<-ggplot()+
+                    geom_sf(data=Cali) +
+                    geom_sf(data=vias_cali, color= "yellow") +
+                    labs(title = 'vías principales')+scale_x_continuous(limits = c(-76.56,-76.45))+
+                    theme(plot.margin = margin(t = 0.1, r = 0.1,  b = 0.1,   l = 0.1, unit="cm"), axis.text = element_text(size = 6),
+                          plot.title = element_text(size=10))
+                  #+ theme_bw() 
+                  
+                  ocho<-ggplot()+
+                    geom_sf(data=Cali) +
+                    geom_sf(data=kinder_cali, color= "orange") +
+                    labs(title = 'Jardines escolares')+scale_x_continuous(limits = c(-76.56,-76.45))+
+                  theme(plot.margin = margin(t = 0.1, r = 0.1,  b = 0.1,   l = 0.1, unit="cm"), axis.text = element_text(size = 6),
+                        plot.title = element_text(size=10))
+                #+                    theme_bw() 
+                  
+                  nueve<-ggplot()+
+                    geom_sf(data=Cali) +
+                    geom_sf(data=retail_cali, color= "purple") +
+                    labs(title = 'Centros comerciales')+scale_x_continuous(limits = c(-76.56,-76.45))+
+                    theme(plot.margin = margin(t = 0.1, r = 0.1,  b = 0.1,   l = 0.1, unit="cm"), axis.text = element_text(size = 6),
+                          plot.title = element_text(size=10))
+                  #+                    theme_bw() 
+                  
+                  p5<-plot_grid(uno, dos, tres, cuatro, cinco,seis,siete,ocho,nueve, nrow  = 3, ncol=3, labels="AUTO")
+                  
+              
+                  plot_grid (cero,p5,
+                    alinear = "h" , eje = "b" , nrow = 1,ncol=2)
+                  
+                  
