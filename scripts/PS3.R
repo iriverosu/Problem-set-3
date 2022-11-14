@@ -9,6 +9,10 @@
     install.packages("spdep")
     install.packages("missForest")
     install.packages("caret", dependencies = c("Depends", "Suggests"))
+    install.packages("Metrics")
+    install.packages("ggplot2")
+    library(ggplot2)
+    library(Metrics)
     library(caret)
     library(tidyverse)
     library(missForest)
@@ -47,7 +51,7 @@
   ##Variables
     #1.Área total o cubierta
     #2.bedrooms
-    #3.bathrooms (k-vecinos)
+    #3.bathrooms (k-vecinos)  
     #4.property type
     #5.Office
     #6.Industrial
@@ -1029,6 +1033,7 @@ leaflet() %>% addTiles() %>% addPolygons(data=Medellin,col="red") %>% addCircles
          train_final$bathrooms_final <- as.integer(train_final$bathrooms_final)
          test$bathrooms_final <- as.integer(test$bathrooms_final)
          test$surface_final <- as.integer(test$surface_final)
+         train_rf$surface_final <- as.integer(train_rf$surface_final)
          
 #-------División de muestra train y test (de Bog y Med)
          
@@ -1061,7 +1066,8 @@ leaflet() %>% addTiles() %>% addPolygons(data=Medellin,col="red") %>% addCircles
          #    TRUE   0.514107 0.4458714 0.3935926 0.005537195 0.01589225 0.004633498
          RMSE      Rsquared   MAE      
          0.514107  0.4458714  0.3935926
-#-----2.Gráfico de coeficientes OLS 
+         
+#-----1.1 .Gráfico de coeficientes OLS 
          
          df_coeficientes_reg<- ols$finalModel$coefficients %>%
            enframe(name = "predictor", value = "coeficiente")
@@ -1076,18 +1082,35 @@ leaflet() %>% addTiles() %>% addPolygons(data=Medellin,col="red") %>% addCircles
                 x = "Variables",
                 y = "Coeficientes") +
            theme_bw()
-#-----3. Forwad selection         
+         
+#-----1.2 Resultados test 
+         y_ols_test<-predict(ols,newdata=test_rf)
+         RMSE1<-rmse(log(test_rf$price), y_ols_test)#0.5190467
+         MAE1<-mae(log(test_rf$price), y_ols_test)#0.3972433
+         RSQUARE = function(y_actual,y_predict){
+             cor(y_actual,y_predict)^2
+         }
+         RSQUARE(log(test_rf$price), y_ols_test) #0.4492948
+         
+#-----2. Forwad selection         
          forward <- train(price ~ ., data = train_ols,
                           method = "leapForward",
                           trControl = trainControl(method = "cv", number = 10))
          forward
          
          nvmax  RMSE       Rsquared   MAE      
-         2      0.5329517  0.4044860  0.4070588
-         3      0.5280726  0.4153445  0.4024745
-         4      0.5228242  0.4269313  0.3994806
+         2      0.5329273  0.4043518  0.4070229
+         3      0.5280398  0.4151745  0.4024380
+         4      0.5227795  0.4267756  0.3994420
          
-#-----4. Backward selection
+#------2.1 Resultados en test 
+         
+         y_forward_test<-predict(forward,newdata=test_rf)
+         RMSE1<-rmse(log(test_rf$price), y_forward_test)#0.526729
+         MAE1<-mae(log(test_rf$price), y_forward_test)#0.4025454
+         RSQUARE(log(test_rf$price), y_forward_test) #0.4327536
+         
+#-----3. Backward selection
          backwards <- train(price ~ ., data = train_ols,
                             method = "leapBackward",
                             trControl = trainControl(method = "cv", number = 10))
@@ -1095,11 +1118,18 @@ leaflet() %>% addTiles() %>% addPolygons(data=Medellin,col="red") %>% addCircles
          
          
          nvmax  RMSE       Rsquared   MAE      
-         2      0.5329619  0.4046171  0.4070488
-         3      0.5280651  0.4155076  0.4024630
-         4      0.5228061  0.4271426  0.3994646
+         2      0.5329517  0.4044860  0.4070588
+         3      0.5280726  0.4153445  0.4024745
+         4      0.5228242  0.4269313  0.3994806
          
-#----2.E L A S T I C   N E T --------------------------------------------------            
+#--------3.1 Resultados en test 
+         y_backwards_test<-predict(backwards,newdata=test_rf)
+         RMSE1<-rmse(log(test_rf$price), y_backwards_test)#0.526729
+         MAE1<-mae(log(test_rf$price), y_backwards_test)#0.4025454
+         RSQUARE(log(test_rf$price), y_backwards_test) #0.4327536
+         
+         
+#----4.E L A S T I C   N E T --------------------------------------------------            
          # Model Building : Elastic Net Regression
          custom <- trainControl(method = "repeatedcv",
                                 number = 10,
@@ -1114,21 +1144,26 @@ leaflet() %>% addTiles() %>% addPolygons(data=Medellin,col="red") %>% addCircles
                      trControl=custom,
                      preProcess = c("center", "scale")
                      )
-#-------Resultados 
+#-------4.1 Resultados 
          en
          mean(en$resample$RMSE) 0.5141376
          mean(en$results$MAE) 0.4131547
          mean(en$results$Rsquared) 0.4233886
-         
+        
          alpha      lambda    RMSE       Rsquared   MAE      
          0.0000000  0.000100  0.5148004  0.4453253  0.3946089
          Fitting alpha = 1, lambda = 1e-04 on full training set
 
-#--------Ploting EN
+#--------4.2 Ploting EN
          plot(en, main = "Elastic Net Regression")
          #plotting important variables
          plot(varImp(en,scale=TRUE))
-         
+
+#--------4.3 Resultados en test 
+         y_en_test<-predict(en,newdata=test_rf)
+         RMSE1<-rmse(log(test_rf$price), y_en_test)#0.5190552
+         MAE1<-mae(log(test_rf$price), y_en_test)#0.3972199
+         RSQUARE(log(test_rf$price), y_en_test) #0.4493329
           
 #----3.R F ------------------------------------------------------------------------------------------------------------------------------------------------------------------------
          install.packages("ranger")
@@ -1136,7 +1171,6 @@ leaflet() %>% addTiles() %>% addPolygons(data=Medellin,col="red") %>% addCircles
          
          #base para reemplazo del modelo
          x_continuas=(train_ols[c(1,3,6,7,8,4,5,9,10,11,12,13,14)])
-         x_continuas<-scale(x_continuas,center=T,scale=T)
          x_categoricas=(train_ols[c(2)])
         # Ahora procedemos a dummyficar la base
          x_categoricas<- model.matrix(~ ., x_categoricas) %>%
@@ -1162,32 +1196,97 @@ leaflet() %>% addTiles() %>% addPolygons(data=Medellin,col="red") %>% addCircles
                                           trControl = cv3,
                                           metric = 'Acurracy', 
                                           verbose = TRUE,
+                                          preProcess= c("center", "scale"),
                                           tuneGrid = tunegrid_rf)
-                        
+#-------Resultados
+                        modeloRF
+                        mean(modeloRF$results$RMSE) 0.363424
+                        mean(modeloRF$results$MAE) 0.2631535
+                        mean(modeloRF$results$Rsquared) 0.728282
+                        RMSE was used to select the optimal model using the smallest value.
+                        The final values used for the model were mtry = 3, splitrule = variance and min.node.size = 10.
                         
                         # El mejor modelo es aquel que tiene mtry = X y min.node.size = X
-                        y_hat_outsample2 = predict(modeloRF, newdata = predicciones_general_t)
+                        y_hat_outsample2 = predict(modeloRF, newdata = test_rf)
                        
 
-#--------------## Visualize variable importance ----------------------------------------------
+#--------------## Visualize variable importance 
                         
-                        # Get variable importance from the model fit
-                        ImpData <- as.data.frame(importance(rf.fit))
-                        ImpData$Var.Names <- row.names(ImpData)
+                        plot(modeloRF)
+                        varImp(modeloRF)
                         
-                        ggplot(ImpData, aes(x=Var.Names, y=`%IncMSE`)) +
-                          geom_segment( aes(x=Var.Names, xend=Var.Names, y=0, yend=`%IncMSE`), color="skyblue") +
-                          geom_point(aes(size = IncNodePurity), color="blue", alpha=0.6) +
-                          theme_light() +
+                        install.packages("ranger")
+                        library(ranger)
+                        modelo  <- ranger(
+                          formula   = price~ .,
+                          data      = x,
+                          num.trees = 10,
+                          seed      = 12345,
+                          importance= "impurity"
+                        )
+                        predicciones <- predict(
+                          modelo,
+                          data = test_rf
+                        )
+                        
+                        test_rmse    <- sqrt(mean((predicciones - log(test_rf$price))^2))
+                        paste("Error de test (rmse) del modelo:", round(test_rmse,2)) #0.35
+        
+                        # Get variable importance from the model fi
+                        importancia_pred <- modelo$variable.importance %>%
+                          enframe(name = "predictor", value = "importancia")
+                        
+                        # Gráfico
+                        grafico1<- ggplot(
+                          data = importancia_pred,
+                          aes(x    = reorder(predictor, importancia),
+                              y    = importancia,
+                              fill = importancia)
+                        ) +
+                          labs(x = "predictor", title = "Importancia predictores (permutación)") +
+                          geom_col() +
                           coord_flip() +
-                          theme(
-                            legend.position="bottom",
-                            panel.grid.major.y = element_blank(),
-                            panel.border = element_blank(),
-                            axis.ticks.y = element_blank()
-                          )    
+                          theme_bw() +
+                          theme(legend.position = "none")
                         
-#------ Modelo XGboots
+                        grafico2<-ggplot(
+                          data = importancia_pred,
+                          aes(x    = reorder(predictor, importancia),
+                              y    = importancia,
+                              fill = importancia)
+                        ) +
+                          labs(x = "predictor", title = "Importancia predictores (pureza de nodos)") +
+                          geom_col() +
+                          coord_flip() +
+                          theme_bw() +
+                          theme(legend.position = "none")
+                        
+                        plot_grid(grafico1, grafico2, nrow  = 1, ncol=2, labels="AUTO")
+                        
+                        
+#--------3.3 Resultados en test 
+                        'property_typeCasa'->names(test_rf)[names(test_rf)=='property_type']
+                        test_rf$property_typeCasa<-ifelse(test_rf$property_typeCasa=="Casa",1,0)
+                        test_rf$property_typeCasa<-as.factor(test_rf$property_typeCasa)
+                        y_rf_test<-predict(modeloRF,newdata=test_rf)
+                        RMSE1<-rmse(log(test_rf$price), y_rf_test)#0.327371
+                        MAE1<-mae(log(test_rf$price), y_rf_test)#0.224281
+                        RSQUARE(log(test_rf$price), y_rf_test) #0.7848002
+                        
+   #--------3.4 Predicciones gráfico
+                        test_rf$y_rf_test <- y_rf_test
+                        pl1 <-test_rf %>% 
+                          ggplot(aes(log(price),y_xg_test)) +
+                          geom_point(alpha=0.5) + 
+                          stat_smooth(aes(Precio='predicho')) +
+                          xlab('Precio real') +
+                          ylab('Precio predicho')+
+                          theme_bw()
+                        
+                        ggplotly(pl1)
+                        
+          
+#------ 4. XGBOOTS ---------------------------------------------------------------------------------------------------------------
                         
                        install.packages("xgboost")
                        library(xgboost)
@@ -1211,8 +1310,9 @@ leaflet() %>% addTiles() %>% addPolygons(data=Medellin,col="red") %>% addCircles
                           data=x,
                           method = "xgbTree",
                           trControl = ctrl,
-                          metric = "Sens",
-                          tuneGrid = grid_default
+                          metric = "RMSE",
+                          tuneGrid = grid_default,
+                          preProcess = c("center", "scale")
                         )
                         
                         Tuning parameter 'colsample_bytree' was held constant at a value of 0.7
@@ -1220,84 +1320,67 @@ leaflet() %>% addTiles() %>% addPolygons(data=Medellin,col="red") %>% addCircles
                         RMSE was used to select the optimal model using the smallest value.
                         The final values used for the model were nrounds = 500, max_depth = 8, eta = 0.3, gamma = 0, colsample_bytree =
                           0.7, min_child_weight = 50 and subsample = 0.6.
+                        xgboost$
+                          
                         
-                        eta   max_depth  gamma  min_child_weight  nrounds  RMSE       Rsquared   MAE      
-                        0.01  4          0      10                250      0.6656511  0.5832051  0.5106976
+                        min(xgboost$results$RMSE) #0.347947
+                        min(xgboost$results$MAE) #0.2450082
+                        max(xgboost$results$Rsquared) #0.7478363
                         
-                        mean(xgboost$results$RMSE) #0.555
-                        mean(xgboost$results$MAE) #0.409243
-                        mean(xgboost$results$Rsquared) #0.6966885
+#--------3.3 Resultados en test 
+                        y_xg_test<-predict(xgboost,newdata=test_rf)
+                        RMSE1<-rmse(log(test_rf$price), y_xg_test)#0.3398501
+                        MAE1<-mae(log(test_rf$price), y_xg_test)#0.2392797
+                        RSQUARE(log(test_rf$price), y_xg_test) #0.7647703
                         
- #----4. Adaboost ---------------------------------------------
-                        
-                        #install.packages("fastAdaboost")
-                        set.seed(1410)
-                        adaboost <- train(
-                          Default ~amount+installment+age+ historygood + historypoor + purposeusedcar+ purposegoods.repair + purposeedu + foreigngerman + rentTRdata = upSampledTrain,
-                          method = "adaboost",
-                          trControl = ctrl,
-                          family = "binomial",
-                          metric = "Sens",
-                          #preProcess = c("center", "scale")
-                        )
-#----4.SP L ---------------------------------------------
-         
-#Pruebas 
-         
-         superlearner
-         
-         require("tidyverse")
-         require("ranger")
-         require("SuperLearner")
-         # set the seed for reproducibility
-         set.seed(123)
-         # generate the observed data
-         n = 1000
-         x = runif(n, 0, 8)
-         y = 5 + 4 * sqrt(9 * x) * as.numeric(x <2) + as.numeric(x >= 2) * (abs(x - 6)^(2)) +rlaplace(n)
-         D <- data.frame(x, y) # observed data
-         
-         xl <- seq(0, 8, 0.1)
-         yl <- 5 + 4 * sqrt(9 * xl) * as.numeric(xl <
-                                                   2) + as.numeric(xl >= 2) * (abs(xl -
-                                                                                     6)^(2))
-         Dl <- data.frame(xl, yl) # for plotting the true data
-         
-         
-         # Specify the number of folds for
-         # V-fold cross-validation
-         folds = 5
-         ## split data into 5 groups for 5-fold
-         ## cross-validation we do this here so
-         ## that the exact same folds will be
-         ## used in both the SL fit with the R
-         ## package, and the hand coded SL
-         index <- split(1:1000, 1:folds)
-         splt <- lapply(1:folds, function(ind) D[index[[ind]], ])
-         
-         # Fit using the SuperLearner package,
-         # specify outcome for prediction
-         # (y), the predictors (x), the loss
-         # function (L2), the library
-         # (sl.lib), and number of folds
-         fitY <- SuperLearner(Y = y, X = data.frame(x),
-                              method = "method.NNLS", SL.library = c("SL.lm", "SL.ranger"),
-                              cvControl = list(V = folds, validRows = index))
-         # View the output: 'Risk' column
-         # returns the CV-MSE estimates
-         # 'Coef' column gives the weights for the final SuperLearner
-         # (meta-learner)
-         fitY
-         
-         # Now predict the outcome for all
-         # possible x
-         yS <- predict(fitY, newdata = data.frame(x = xl),onlySL = T)$pred
-         # Create a dataframe of all x
-         # and predicted SL responses
-         Dl1 <- data.frame(xl, yS)
-         
+#--------3.3 Gráfico de resultados  
+                      resultados %>% mutate(modelo = fct_relevel(modelo, 
+                                                               "RANDOM FOREST","XG-BOOST","OLS", "ELASTIC NET", "FORWARD", "BACWARD")) %>%
+                      install.packages("cowplot")
+                        library(cowplot)  
+                         Barra1<- ggplot(resultados,aes(modelo,RMSE))+ geom_bar(width = 0.9, stat="identity",             
+                                                                        position = position_dodge())+ ylim(c(0,0.75))+
+                            labs(x="Modelo de regresión", y= "RMSE \n (Fuera de muestra)") +
+                            labs(fill = "")+ theme_linedraw()+facet_grid(~"Diagrama de barras para el RMSE")+
+                            geom_text(aes(label=RMSE), vjust=0.9, hjust=1.2, color="white",position = position_dodge(0.9),size=4.0) + 
+                            theme_bw(base_size=15)        + theme_light() +coord_flip()   +scale_fill_manual(values=brewer.pal(n = 3, name = "Accent"))    
+                          
+                         Barra2<- ggplot(resultados,aes(modelo,Rsquared))+ geom_bar(width = 0.9, stat="identity",              
+                                                                                position = position_dodge())+ ylim(c(0,1))+
+                           labs(x="Modelo de regresión", y= "Rcuadrado \n (Fuera de muestra)") +
+                           labs(fill = "darkblue")+ theme_linedraw()+facet_grid(~"Diagrama de barras para el Rcuadrado")+
+                           geom_text(aes(label=Rsquared), vjust=0.9, hjust=1.2, color="white",position = position_dodge(0.9),size=4.0) + 
+                           theme_bw(base_size=15)        + theme_light() +coord_flip()  +scale_fill_manual(values=brewer.pal(n = 3, name = "Accent"))  
+                         
+                    
+                      plot_grid(Barra1, Barra2, nrow  = 1, ncol=2, labels="AUTO")
+                         
 #------------------------------------------------------ Estadísticas Descriptívas ---------------------------------------------------------------------------------------------------------------------- 
-
+               
+                      library(ggplot2)
+                      install.packages("corrplot")
+                      library(corrplot)
+                      library(mlbench)
+                      install.packages("Amelia")
+                      library(Amelia)
+                      install.packages("plotly")
+                      library(plotly)
+                      library(reshape2)
+                      library(caret)
+                      library(caTools)
+                      library(dplyr) 
+#Correlación entre variables
+                      corrplot(cor(select(x,-property_typeCasa)))
+#Effect of the variables in the dataframe on price.
+                        x %>%
+                        select(c(-property_typeCasa)) %>%
+                        melt(id.vars = "price") %>%
+                        ggplot(aes(x = value, y = price, colour = variable)) +
+                        geom_point(alpha = 0.7) +
+                        stat_smooth(aes(colour = "black")) +
+                        facet_wrap(~variable, scales = "free", ncol = 2) +
+                        labs(x = "Variable Value", y = "Median House Price ($1000s)") +
+                        theme_minimal()
 #------------------------------------------------------ Depurar bases  ---------------------------------------------------------------------------------------------------------------------- 
          
          rm(train_cali)
