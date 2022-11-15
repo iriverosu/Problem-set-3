@@ -43,7 +43,6 @@
     
     leaflet() %>% addTiles() %>% addCircleMarkers(data=train2)
     names(train2)
-    
     test <- st_as_sf(x = test, ## datos
                        coords=c("lon","lat"), ## coordenadas
                        crs=4326) ## CRS
@@ -128,7 +127,6 @@
   
 #1. Área total tes----------------------------------------------------------------------------------------------------
     #----------1.1 Texto 
-    
     x <- "[:space:]+[:digit:]+[:punct:]+[:digit:]+[:space:]+"
     str_locate_all(string = test$description , pattern = x) ## detect pattern
     str_extract(string = test$description , pattern= x) ## extrac pattern
@@ -1550,6 +1548,9 @@ leaflet() %>% addTiles() %>% addPolygons(data=Medellin,col="red") %>% addCircles
          test$property_typeCasa<-as.factor(test$property_typeCasa)
          y_rf_test_final<-predict(modeloRF,newdata=test)
          test$y_rf_test_final<-y_rf_test_final
+         sqrt(7.798392e+16)
+         mean(exp(y_rf_test_final)/test$surface_final)
+         mean(exp(train_bog$price)/train_bog$surface_final)
          
          pl <- ggplot(test, aes(x=exp(y_rf_test_final)))
          p3<-pl + geom_histogram( aes(fill=..count..), col='black')+ labs(title = 'Precio total vivienda en Cali',
@@ -1710,4 +1711,10 @@ leaflet() %>% addTiles() %>% addPolygons(data=Medellin,col="red") %>% addCircles
                   plot_grid (cero,p5,
                     alinear = "h" , eje = "b" , nrow = 1,ncol=2)
                   
+              x2$property_id<-test$property_id
+              x2<- select(x2,property_id, price)
+              predictions<-x2
                   
+             submission_template$price=predictions$price
+            submission_template==predictions_cuellar_mendivelso_riveros.csv
+             
